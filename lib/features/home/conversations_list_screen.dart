@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/nearby_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/empty_state.dart';
 
@@ -18,7 +21,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   @override
   void initState() {
     super.initState();
-    // Démarre la découverte P2P au lancement de l'écran principal
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<NearbyProvider>().start();
     });
@@ -26,8 +28,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileProvider>();
     final nearby = context.watch<NearbyProvider>();
+    final chat = context.watch<ChatProvider>();
 
     return Scaffold(
       appBar: AppBar(
@@ -35,9 +37,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: recherche de discussions
-            },
+            onPressed: () {},
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
@@ -67,25 +67,25 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: nearby.isDiscovering
+            color: nearby.isRunning
                 ? AppColors.accent.withValues(alpha: 0.15)
                 : Colors.grey.withValues(alpha: 0.1),
             child: Row(
               children: [
                 Icon(
-                  nearby.isDiscovering ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
+                  nearby.isRunning ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
                   size: 18,
-                  color: nearby.isDiscovering ? AppColors.accent : Colors.grey,
+                  color: nearby.isRunning ? AppColors.accent : Colors.grey,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    nearby.isDiscovering
-                        ? 'Recherche d\'appareils UpChat… (${nearby.nearbyDevices.length} trouvé(s))'
+                    nearby.isRunning
+                        ? 'Recherche… ${nearby.nearbyDevices.length} appareil(s) trouvé(s)'
                         : 'Découverte arrêtée',
                     style: TextStyle(
                       fontSize: 13,
-                      color: nearby.isDiscovering ? AppColors.primary : Colors.grey,
+                      color: nearby.isRunning ? AppColors.primary : Colors.grey,
                     ),
                   ),
                 ),
@@ -93,48 +93,122 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             ),
           ),
 
-          // Liste des conversations (vide pour l'instant)
           Expanded(
-            child: nearby.nearbyDevices.isEmpty
+            child: chat.conversations.isEmpty && nearby.nearbyDevices.isEmpty
                 ? const EmptyState(
                     icon: Icons.chat_bubble_outline_rounded,
                     title: 'Aucune discussion',
                     subtitle: 'Approche-toi d\'autres téléphones UpChat pour commencer à chatter hors ligne.',
                   )
-                : ListView.builder(
-                    itemCount: nearby.nearbyDevices.length,
-                    itemBuilder: (context, index) {
-                      final device = nearby.nearbyDevices[index];
-                      return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.primary,
+                : ListView(
+                    children: [
+                      // Appareils à proximité (pas encore de conversation)
+                      if (nearby.nearbyDevices.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
                           child: Text(
-                            (device['name'] as String? ?? '?')[0].toUpperCase(),
-                            style: const TextStyle(color: Colors.white),
+                            'À proximité',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                        title: Text(device['name'] as String? ?? 'Inconnu'),
-                        subtitle: const Text('Appareil à proximité'),
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRouter.chat,
-                            arguments: {
-                              'conversationId': device['endpointId'],
-                              'peerName': device['name'] ?? 'Contact',
-                              'peerId': device['endpointId'],
+                        ...nearby.nearbyDevices.map((device) {
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.primary,
+                              child: Text(
+                                device.name.isNotEmpty ? device.name[0].toUpperCase() : '?',
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                            title: Text(device.name),
+                            subtitle: const Text('Appareil UpChat à proximité'),
+                            trailing: const Icon(Icons.circle, size: 10, color: AppColors.online),
+                            onTap: () {
+                              final conv = context.read<ChatProvider>().getOrCreateConversation(
+                                    peerId: device.id,
+                                    peerName: device.name,
+                                    endpointId: device.endpointId,
+                                  );
+                              Navigator.pushNamed(
+                                context,
+                                AppRouter.chat,
+                                arguments: {
+                                  'conversationId': conv.id,
+                                  'peerName': device.name,
+                                  'peerId': device.id,
+                                },
+                              );
                             },
                           );
-                        },
-                      );
-                    },
+                        }),
+                        const Divider(),
+                      ],
+
+                      // Conversations existantes
+                      ...chat.conversations.map((conv) {
+                        final time = conv.lastMessageAt != null
+                            ? DateFormat('HH:mm').format(conv.lastMessageAt!)
+                            : '';
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary,
+                            child: Text(
+                              conv.title.isNotEmpty ? conv.title[0].toUpperCase() : '?',
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(conv.title),
+                          subtitle: Text(
+                            conv.lastMessage ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                              if (conv.unreadCount > 0) ...[
+                                const SizedBox(height: 4),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.accent,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${conv.unreadCount}',
+                                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRouter.chat,
+                              arguments: {
+                                'conversationId': conv.id,
+                                'peerName': conv.title,
+                                'peerId': conv.id,
+                              },
+                            );
+                          },
+                        );
+                      }),
+                    ],
                   ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // TODO: ouvrir sélecteur de contacts proches
+          // Ouvre la liste des appareils proches si disponible
         },
         child: const Icon(Icons.message_rounded),
       ),

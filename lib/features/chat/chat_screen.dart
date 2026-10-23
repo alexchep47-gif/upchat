@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
+
 import '../../core/theme/app_colors.dart';
+import '../../data/models/message_model.dart';
+import '../../providers/chat_provider.dart';
+import '../../providers/nearby_provider.dart';
 import '../../widgets/empty_state.dart';
 
 /// Écran de discussion 1-à-1
@@ -21,11 +27,21 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [];
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Marque comme lu
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ChatProvider>().markAsRead(widget.conversationId);
+    });
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -33,23 +49,44 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    setState(() {
-      _messages.add({
-        'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'text': text,
-        'isMe': true,
-        'time': DateTime.now(),
-        'status': 'sent',
-      });
-    });
+    final nearby = context.read<NearbyProvider>();
+    final chat = context.read<ChatProvider>();
+
+    // Cherche l'endpointId du contact
+    String? endpointId;
+    for (final entry in nearby.connectedEndpoints.entries) {
+      if (entry.value == widget.peerId) {
+        endpointId = entry.key;
+        break;
+      }
+    }
+    // Fallback : parfois peerId = endpointId
+    endpointId ??= widget.peerId;
+
+    chat.sendTextMessage(
+      conversationId: widget.conversationId,
+      text: text,
+      endpointId: endpointId,
+    );
+
     _controller.clear();
 
-    // TODO: envoyer via Nearby Connections
+    // Scroll en bas
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final messages = context.watch<ChatProvider>().messagesFor(widget.conversationId);
 
     return Scaffold(
       appBar: AppBar(
@@ -70,46 +107,19 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: _messages.isEmpty
+            child: messages.isEmpty
                 ? const EmptyState(
                     icon: Icons.lock_outline_rounded,
                     title: 'Conversation chiffrée',
-                    subtitle: 'Les messages sont stockés uniquement sur cet appareil.',
+                    subtitle: 'Les messages sont stockés uniquement sur cet appareil.\nIls seront envoyés dès que le contact est à portée.',
                   )
                 : ListView.builder(
+                    controller: _scrollController,
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    itemCount: _messages.length,
+                    itemCount: messages.length,
                     itemBuilder: (context, index) {
-                      final msg = _messages[index];
-                      final isMe = msg['isMe'] as bool;
-                      return Align(
-                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 3),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.75,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isMe
-                                ? (isDark ? AppColors.bubbleMeDark : AppColors.bubbleMe)
-                                : (isDark ? AppColors.bubbleOtherDark : AppColors.bubbleOther),
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(12),
-                              topRight: const Radius.circular(12),
-                              bottomLeft: Radius.circular(isMe ? 12 : 0),
-                              bottomRight: Radius.circular(isMe ? 0 : 12),
-                            ),
-                          ),
-                          child: Text(
-                            msg['text'] as String,
-                            style: TextStyle(
-                              color: isDark ? Colors.white : Colors.black87,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                      );
+                      final msg = messages[index];
+                      return _MessageBubble(message: msg, isDark: isDark);
                     },
                   ),
           ),
@@ -124,7 +134,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   IconButton(
                     icon: const Icon(Icons.attach_file),
                     onPressed: () {
-                      // TODO: sélection média
+                      // TODO: médias
                     },
                   ),
                   Expanded(
@@ -154,6 +164,83 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  final MessageModel message;
+  final bool isDark;
+
+  const _MessageBubble({required this.message, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final isMe = message.isMe;
+    final time = DateFormat('HH:mm').format(message.createdAt);
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: isMe
+              ? (isDark ? AppColors.bubbleMeDark : AppColors.bubbleMe)
+              : (isDark ? AppColors.bubbleOtherDark : AppColors.bubbleOther),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(12),
+            topRight: const Radius.circular(12),
+            bottomLeft: Radius.circular(isMe ? 12 : 0),
+            bottomRight: Radius.circular(isMe ? 0 : 12),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              message.content,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black87,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  time,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.black45,
+                  ),
+                ),
+                if (isMe) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    message.status == MessageStatus.read
+                        ? Icons.done_all
+                        : message.status == MessageStatus.delivered ||
+                                message.status == MessageStatus.sent
+                            ? Icons.done_all
+                            : message.status == MessageStatus.failed
+                                ? Icons.error_outline
+                                : Icons.access_time,
+                    size: 14,
+                    color: message.status == MessageStatus.read
+                        ? Colors.blue
+                        : (isDark ? Colors.white54 : Colors.black45),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
