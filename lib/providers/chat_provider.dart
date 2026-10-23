@@ -22,12 +22,10 @@ class ChatProvider extends ChangeNotifier {
 
   ChatProvider() {
     _loadFromStorage();
-    // Écoute les messages entrants
     _nearby.onMessageReceived = _onIncomingMessage;
   }
 
   void _loadFromStorage() {
-    // Charge les conversations
     for (final key in StorageService.conversations.keys) {
       final map = StorageService.conversations.get(key);
       if (map is Map) {
@@ -40,7 +38,6 @@ class ChatProvider extends ChangeNotifier {
       return bTime.compareTo(aTime);
     });
 
-    // Charge les messages
     for (final key in StorageService.messages.keys) {
       final map = StorageService.messages.get(key);
       if (map is Map) {
@@ -50,7 +47,6 @@ class ChatProvider extends ChangeNotifier {
       }
     }
 
-    // Trie les messages par date
     for (final list in _messages.values) {
       list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     }
@@ -58,7 +54,6 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Crée ou récupère une conversation 1-à-1
   ConversationModel getOrCreateConversation({
     required String peerId,
     required String peerName,
@@ -97,16 +92,8 @@ class ChatProvider extends ChangeNotifier {
       status: MessageStatus.sending,
     );
 
-    // Ajoute localement
-    _messages.putIfAbsent(conversationId, () => []);
-    _messages[conversationId]!.add(message);
-    _updateConversationPreview(conversationId, text);
-    notifyListeners();
+    _addLocalMessage(message, preview: text);
 
-    // Sauvegarde
-    await StorageService.messages.put(message.id, message.toMap());
-
-    // Envoi P2P si on a un endpoint
     bool success = false;
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
@@ -116,35 +103,80 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    // Met à jour le statut
-    final index = _messages[conversationId]!.indexWhere((m) => m.id == message.id);
-    if (index != -1) {
-      _messages[conversationId]![index] = message.copyWith(
-        status: success ? MessageStatus.sent : MessageStatus.failed,
-      );
-      await StorageService.messages.put(
-        message.id,
-        _messages[conversationId]![index].toMap(),
-      );
-      notifyListeners();
-    }
+    _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
-  /// Message entrant (depuis NearbyService)
+  /// Envoie un média (image / vidéo)
+  Future<void> sendMediaMessage({
+    required String conversationId,
+    required String mediaPath,
+    required MessageType type,
+    String? endpointId,
+  }) async {
+    final preview = type == MessageType.image
+        ? '📷 Photo'
+        : type == MessageType.video
+            ? '🎬 Vidéo'
+            : '📎 Fichier';
+
+    final message = MessageModel(
+      id: _uuid.v4(),
+      conversationId: conversationId,
+      senderId: StorageService.userId,
+      senderName: StorageService.userName,
+      type: type,
+      content: preview,
+      mediaPath: mediaPath,
+      isMe: true,
+      status: MessageStatus.sending,
+    );
+
+    _addLocalMessage(message, preview: preview);
+
+    // Pour l'instant on envoie juste le texte de preview via P2P
+    // (transfert de fichiers binaires à améliorer en v2)
+    bool success = false;
+    if (endpointId != null) {
+      success = await _nearby.sendTextMessage(
+        endpointId: endpointId,
+        conversationId: conversationId,
+        text: preview,
+      );
+    }
+
+    _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
+  }
+
+  void _addLocalMessage(MessageModel message, {required String preview}) {
+    _messages.putIfAbsent(message.conversationId, () => []);
+    _messages[message.conversationId]!.add(message);
+    _updateConversationPreview(message.conversationId, preview);
+    StorageService.messages.put(message.id, message.toMap());
+    notifyListeners();
+  }
+
+  void _updateMessageStatus(MessageModel message, MessageStatus status) {
+    final list = _messages[message.conversationId];
+    if (list == null) return;
+    final index = list.indexWhere((m) => m.id == message.id);
+    if (index == -1) return;
+
+    list[index] = message.copyWith(status: status);
+    StorageService.messages.put(message.id, list[index].toMap());
+    notifyListeners();
+  }
+
   void _onIncomingMessage(MessageModel message) {
-    // Crée la conversation si besoin
     getOrCreateConversation(
       peerId: message.senderId,
       peerName: message.senderName,
     );
 
     _messages.putIfAbsent(message.conversationId, () => []);
-    // Évite les doublons
     if (_messages[message.conversationId]!.any((m) => m.id == message.id)) return;
 
     _messages[message.conversationId]!.add(message);
     _updateConversationPreview(message.conversationId, message.content, isIncoming: true);
-
     StorageService.messages.put(message.id, message.toMap());
     notifyListeners();
   }
@@ -160,14 +192,11 @@ class ChatProvider extends ChangeNotifier {
       unreadCount: isIncoming ? conv.unreadCount + 1 : conv.unreadCount,
     );
 
-    // Remonte en haut de la liste
     final updated = _conversations.removeAt(index);
     _conversations.insert(0, updated);
-
     StorageService.conversations.put(conversationId, updated.toMap());
   }
 
-  /// Marque une conversation comme lue
   void markAsRead(String conversationId) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index == -1) return;

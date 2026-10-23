@@ -1,8 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/media_helper.dart';
 import '../../data/models/message_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/nearby_provider.dart';
@@ -32,7 +35,6 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Marque comme lu
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ChatProvider>().markAsRead(widget.conversationId);
     });
@@ -45,33 +47,50 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  String? _resolveEndpointId() {
+    final nearby = context.read<NearbyProvider>();
+    for (final entry in nearby.connectedEndpoints.entries) {
+      if (entry.value == widget.peerId) return entry.key;
+    }
+    return widget.peerId;
+  }
+
   void _sendMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
 
-    final nearby = context.read<NearbyProvider>();
-    final chat = context.read<ChatProvider>();
-
-    // Cherche l'endpointId du contact
-    String? endpointId;
-    for (final entry in nearby.connectedEndpoints.entries) {
-      if (entry.value == widget.peerId) {
-        endpointId = entry.key;
-        break;
-      }
-    }
-    // Fallback : parfois peerId = endpointId
-    endpointId ??= widget.peerId;
-
-    chat.sendTextMessage(
-      conversationId: widget.conversationId,
-      text: text,
-      endpointId: endpointId,
-    );
+    context.read<ChatProvider>().sendTextMessage(
+          conversationId: widget.conversationId,
+          text: text,
+          endpointId: _resolveEndpointId(),
+        );
 
     _controller.clear();
+    _scrollToBottom();
+  }
 
-    // Scroll en bas
+  void _pickAndSendMedia() {
+    MediaHelper.showMediaPicker(
+      context: context,
+      onPicked: (path, type) {
+        final msgType = type == 'image'
+            ? MessageType.image
+            : type == 'video'
+                ? MessageType.video
+                : MessageType.file;
+
+        context.read<ChatProvider>().sendMediaMessage(
+              conversationId: widget.conversationId,
+              mediaPath: path,
+              type: msgType,
+              endpointId: _resolveEndpointId(),
+            );
+        _scrollToBottom();
+      },
+    );
+  }
+
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -111,7 +130,8 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? const EmptyState(
                     icon: Icons.lock_outline_rounded,
                     title: 'Conversation chiffrée',
-                    subtitle: 'Les messages sont stockés uniquement sur cet appareil.\nIls seront envoyés dès que le contact est à portée.',
+                    subtitle:
+                        'Les messages sont stockés uniquement sur cet appareil.\nIls seront envoyés dès que le contact est à portée.',
                   )
                 : ListView.builder(
                     controller: _scrollController,
@@ -133,9 +153,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.attach_file),
-                    onPressed: () {
-                      // TODO: médias
-                    },
+                    onPressed: _pickAndSendMedia,
                   ),
                   Expanded(
                     child: TextField(
@@ -148,12 +166,6 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                       onSubmitted: (_) => _sendMessage(),
                     ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.mic),
-                    onPressed: () {
-                      // TODO: note vocale
-                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.send_rounded, color: AppColors.accent),
@@ -184,7 +196,7 @@ class _MessageBubble extends StatelessWidget {
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
@@ -202,13 +214,58 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
-              message.content,
-              style: TextStyle(
-                color: isDark ? Colors.white : Colors.black87,
-                fontSize: 15,
+            // Contenu image
+            if (message.type == MessageType.image && message.mediaPath != null) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: kIsWeb
+                    ? Container(
+                        height: 180,
+                        width: 220,
+                        color: Colors.black26,
+                        child: const Icon(Icons.image, size: 48),
+                      )
+                    : Image.file(
+                        File(message.mediaPath!),
+                        height: 180,
+                        width: 220,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          height: 120,
+                          width: 180,
+                          color: Colors.black26,
+                          child: const Icon(Icons.broken_image),
+                        ),
+                      ),
               ),
-            ),
+              const SizedBox(height: 4),
+            ],
+
+            // Contenu texte / preview
+            if (message.type == MessageType.text || message.mediaPath == null)
+              Text(
+                message.content,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 15,
+                ),
+              )
+            else if (message.type == MessageType.video)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.play_circle_outline, size: 20),
+                  const SizedBox(width: 6),
+                  Text(
+                    message.content,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.black87,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+
             const SizedBox(height: 2),
             Row(
               mainAxisSize: MainAxisSize.min,
