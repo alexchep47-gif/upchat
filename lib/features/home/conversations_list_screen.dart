@@ -6,10 +6,10 @@ import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/nearby_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/connectivity_provider.dart';
 import '../../features/stories/stories_bar.dart';
 import '../../widgets/empty_state.dart';
 
-/// Liste des discussions (style WhatsApp)
 class ConversationsListScreen extends StatefulWidget {
   const ConversationsListScreen({super.key});
 
@@ -30,15 +30,13 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   Widget build(BuildContext context) {
     final nearby = context.watch<NearbyProvider>();
     final chat = context.watch<ChatProvider>();
+    final connectivity = context.watch<ConnectivityProvider>();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('UpChat'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
+          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
           PopupMenuButton<String>(
             onSelected: (value) {
               switch (value) {
@@ -67,29 +65,45 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
       ),
       body: Column(
         children: [
-          // Barre de statut Nearby
+          // Barre de statut (offline / hybride)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            color: nearby.isRunning
-                ? AppColors.accent.withOpacity(0.15)
-                : Colors.grey.withOpacity(0.1),
+            color: connectivity.isHybridReady
+                ? Colors.blue.withOpacity(0.12)
+                : nearby.isRunning
+                    ? AppColors.accent.withOpacity(0.15)
+                    : Colors.grey.withOpacity(0.1),
             child: Row(
               children: [
                 Icon(
-                  nearby.isRunning ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
+                  connectivity.isHybridReady
+                      ? Icons.public
+                      : nearby.isRunning
+                          ? Icons.bluetooth_searching
+                          : Icons.bluetooth_disabled,
                   size: 18,
-                  color: nearby.isRunning ? AppColors.accent : Colors.grey,
+                  color: connectivity.isHybridReady
+                      ? Colors.blue
+                      : nearby.isRunning
+                          ? AppColors.accent
+                          : Colors.grey,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    nearby.isRunning
-                        ? 'Recherche… ${nearby.nearbyDevices.length} appareil(s) trouvé(s)'
-                        : 'Découverte arrêtée',
+                    connectivity.isHybridReady
+                        ? 'Mode hybride — local + internet'
+                        : nearby.isRunning
+                            ? 'Offline — ${nearby.nearbyDevices.length} appareil(s) proche(s)'
+                            : connectivity.statusLabel,
                     style: TextStyle(
                       fontSize: 13,
-                      color: nearby.isRunning ? AppColors.primary : Colors.grey,
+                      color: connectivity.isHybridReady
+                          ? Colors.blue.shade700
+                          : nearby.isRunning
+                              ? AppColors.primary
+                              : Colors.grey,
                     ),
                   ),
                 ),
@@ -97,22 +111,20 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             ),
           ),
 
-          // Stories
           const StoriesBar(),
-
           const Divider(height: 1),
 
           Expanded(
             child: chat.conversations.isEmpty && nearby.nearbyDevices.isEmpty
-                ? const EmptyState(
+                ? EmptyState(
                     icon: Icons.chat_bubble_outline_rounded,
                     title: 'Aucune discussion',
-                    subtitle:
-                        'Approche-toi d\'autres téléphones UpChat pour commencer à chatter hors ligne.',
+                    subtitle: connectivity.internetModeEnabled
+                        ? 'Active le Bluetooth pour le local, ou attends des contacts en ligne (mode internet).'
+                        : 'Approche-toi d\'autres téléphones UpChat, ou active le mode internet dans Réglages.',
                   )
                 : ListView(
                     children: [
-                      // Appareils à proximité
                       if (nearby.nearbyDevices.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -157,8 +169,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                         }),
                         const Divider(),
                       ],
-
-                      // Conversations existantes
                       ...chat.conversations.map((conv) {
                         final time = conv.lastMessageAt != null
                             ? DateFormat('HH:mm').format(conv.lastMessageAt!)
@@ -217,9 +227,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.pushNamed(context, AppRouter.createStory);
-        },
+        onPressed: () => Navigator.pushNamed(context, AppRouter.createStory),
         child: const Icon(Icons.camera_alt_rounded),
       ),
     );

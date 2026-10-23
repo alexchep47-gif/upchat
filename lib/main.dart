@@ -13,6 +13,7 @@ import 'providers/profile_provider.dart';
 import 'providers/nearby_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/stories_provider.dart';
+import 'providers/connectivity_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,6 @@ void main() async {
   await Hive.initFlutter();
   await StorageService.init();
 
-  // Nettoyage au démarrage (stories expirées, vieux médias)
   CleanupService().run();
 
   runApp(const UpChatApp());
@@ -43,6 +43,7 @@ class UpChatApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NearbyProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => StoriesProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
