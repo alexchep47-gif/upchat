@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
 import 'data/services/storage_service.dart';
+import 'data/services/cleanup_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/nearby_provider.dart';
@@ -16,15 +17,16 @@ import 'providers/stories_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Orientation portrait uniquement
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Initialisation Hive
   await Hive.initFlutter();
   await StorageService.init();
+
+  // Nettoyage au démarrage (stories expirées, vieux médias)
+  CleanupService().run();
 
   runApp(const UpChatApp());
 }

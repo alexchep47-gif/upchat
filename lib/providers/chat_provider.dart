@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
@@ -5,11 +6,13 @@ import '../data/models/conversation_model.dart';
 import '../data/models/message_model.dart';
 import '../data/services/storage_service.dart';
 import '../data/services/nearby_service.dart';
+import '../data/services/mesh_service.dart';
 
-/// Gère les conversations et les messages (stockage Hive + envoi P2P)
+/// Gère les conversations et les messages (stockage Hive + envoi P2P + mesh)
 class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
   final NearbyService _nearby = NearbyService();
+  final MeshService _mesh = MeshService();
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
@@ -23,6 +26,9 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider() {
     _loadFromStorage();
     _nearby.onMessageReceived = _onIncomingMessage;
+    _nearby.onConnected = (endpointId, userId) {
+      _mesh.onNewConnection(endpointId, userId);
+    };
   }
 
   void _loadFromStorage() {
@@ -39,11 +45,14 @@ class ChatProvider extends ChangeNotifier {
     });
 
     for (final key in StorageService.messages.keys) {
+      if (key.toString().startsWith('relay_')) continue;
       final map = StorageService.messages.get(key);
       if (map is Map) {
-        final msg = MessageModel.fromMap(Map<String, dynamic>.from(map));
-        _messages.putIfAbsent(msg.conversationId, () => []);
-        _messages[msg.conversationId]!.add(msg);
+        try {
+          final msg = MessageModel.fromMap(Map<String, dynamic>.from(map));
+          _messages.putIfAbsent(msg.conversationId, () => []);
+          _messages[msg.conversationId]!.add(msg);
+        } catch (_) {}
       }
     }
 
@@ -93,6 +102,7 @@ class ChatProvider extends ChangeNotifier {
 
     _addLocalMessage(message, preview: text);
 
+    // Essaie envoi direct, sinon mesh
     bool success = false;
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
@@ -102,10 +112,18 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
+    if (!success) {
+      // Relais mesh vers le destinataire (conversationId = peerId en 1-à-1)
+      success = await _mesh.sendWithMesh(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: text,
+      );
+    }
+
     _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
-  /// Envoie un média (image / vidéo / audio) avec transfert binaire
   Future<void> sendMediaMessage({
     required String conversationId,
     required String mediaPath,
@@ -144,6 +162,17 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
+    // Mesh pour médias : on relaie au moins le preview texte
+    if (!success) {
+      success = await _mesh.sendWithMesh(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: preview,
+        type: type,
+        mediaPath: mediaPath,
+      );
+    }
+
     _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
@@ -167,6 +196,17 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _onIncomingMessage(MessageModel message) {
+    // Détecte les payloads mesh
+    if (message.content.startsWith('{') && message.content.contains('mesh_relay')) {
+      try {
+        final map = jsonDecode(message.content) as Map<String, dynamic>;
+        if (map['type'] == 'mesh_relay') {
+          _mesh.handleRelayPayload(map);
+          return;
+        }
+      } catch (_) {}
+    }
+
     getOrCreateConversation(
       peerId: message.senderId,
       peerName: message.senderName,
