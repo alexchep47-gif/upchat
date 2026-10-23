@@ -72,8 +72,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: nearby.isRunning
-                ? AppColors.accent.withValues(alpha: 0.15)
-                : Colors.grey.withValues(alpha: 0.1),
+                ? AppColors.accent.withOpacity(0.15)
+                : Colors.grey.withOpacity(0.1),
             child: Row(
               children: [
                 Icon(
