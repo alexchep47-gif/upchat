@@ -18,7 +18,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final TextEditingController _nameController = TextEditingController();
   int _currentPage = 0;
-  bool _permissionsGranted = false;
+  bool _requestingPermissions = false;
 
   @override
   void initState() {
@@ -38,10 +38,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  Future<void> _requestPermissions() async {
-    final granted = await PermissionHelper.requestAll();
-    setState(() => _permissionsGranted = granted);
-    if (granted) {
+  Future<void> _requestPermissionsAndContinue() async {
+    if (_requestingPermissions) return;
+    setState(() => _requestingPermissions = true);
+
+    try {
+      // On demande les permissions, mais on continue TOUJOURS après
+      // (sur web / certains appareils elles ne sont pas disponibles)
+      await PermissionHelper.requestAll();
+    } catch (e) {
+      // Ignore les erreurs de permissions
+    }
+
+    if (mounted) {
+      setState(() => _requestingPermissions = false);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -89,14 +99,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     icon: Icons.bluetooth_searching_rounded,
                     title: 'Permissions nécessaires',
                     subtitle:
-                        'UpChat a besoin de Bluetooth, Localisation et Caméra pour découvrir les appareils proches et envoyer des médias.',
-                    buttonLabel: _permissionsGranted ? 'Continuer' : 'Autoriser',
-                    onPressed: _permissionsGranted
-                        ? () => _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                            )
-                        : _requestPermissions,
+                        'UpChat a besoin de Bluetooth, Localisation et Caméra pour découvrir les appareils proches et envoyer des médias.\n\nTu pourras les accorder plus tard dans les réglages du téléphone.',
+                    buttonLabel: _requestingPermissions ? 'Patiente…' : 'Autoriser',
+                    onPressed: _requestingPermissions ? null : _requestPermissionsAndContinue,
+                    secondaryButtonLabel: 'Passer cette étape',
+                    onSecondaryPressed: () {
+                      _pageController.nextPage(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeInOut,
+                      );
+                    },
                   ),
                   // Page 3 — Nom
                   Padding(
@@ -179,7 +191,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String title,
     required String subtitle,
     required String buttonLabel,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
+    String? secondaryButtonLabel,
+    VoidCallback? onSecondaryPressed,
   }) {
     return Padding(
       padding: const EdgeInsets.all(32),
@@ -215,6 +229,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Text(buttonLabel, style: const TextStyle(fontSize: 16)),
             ),
           ),
+          if (secondaryButtonLabel != null && onSecondaryPressed != null) ...[
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: onSecondaryPressed,
+              child: Text(
+                secondaryButtonLabel,
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ),
+          ],
         ],
       ),
     );
