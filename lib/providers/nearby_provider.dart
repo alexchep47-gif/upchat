@@ -1,47 +1,70 @@
 import 'package:flutter/material.dart';
+import '../data/models/user_model.dart';
+import '../data/models/message_model.dart';
+import '../data/services/nearby_service.dart';
 
-/// État de la découverte et des connexions P2P
-/// (implémentation complète de Nearby Connections à venir)
+/// Bridge entre NearbyService et l'UI (Provider)
 class NearbyProvider extends ChangeNotifier {
-  bool _isDiscovering = false;
-  bool _isAdvertising = false;
-  final List<Map<String, dynamic>> _nearbyDevices = [];
-  final Map<String, String> _connectedEndpoints = {}; // endpointId → userId
+  final NearbyService _service = NearbyService();
 
-  bool get isDiscovering => _isDiscovering;
-  bool get isAdvertising => _isAdvertising;
-  List<Map<String, dynamic>> get nearbyDevices => List.unmodifiable(_nearbyDevices);
-  Map<String, String> get connectedEndpoints => Map.unmodifiable(_connectedEndpoints);
+  bool _isRunning = false;
+  List<UserModel> _devices = [];
+  final Map<String, String> _connected = {}; // endpointId → userId
 
-  bool get hasNearbyDevices => _nearbyDevices.isNotEmpty;
+  bool get isRunning => _isRunning;
+  bool get isDiscovering => _service.isDiscovering;
+  bool get isAdvertising => _service.isAdvertising;
+  List<UserModel> get nearbyDevices => List.unmodifiable(_devices);
+  Map<String, String> get connectedEndpoints => Map.unmodifiable(_connected);
+  bool get hasNearbyDevices => _devices.isNotEmpty;
+
+  NearbyProvider() {
+    _service.onDevicesChanged = (devices) {
+      _devices = devices;
+      notifyListeners();
+    };
+    _service.onConnected = (endpointId, userId) {
+      _connected[endpointId] = userId;
+      notifyListeners();
+    };
+    _service.onDisconnected = (endpointId) {
+      _connected.remove(endpointId);
+      notifyListeners();
+    };
+  }
 
   /// Démarre la découverte + publicité
   Future<void> start() async {
-    // TODO: implémenter Nearby Connections
-    _isDiscovering = true;
-    _isAdvertising = true;
+    if (_isRunning) return;
+    await _service.start();
+    _isRunning = true;
     notifyListeners();
   }
 
   /// Arrête tout
   Future<void> stop() async {
-    _isDiscovering = false;
-    _isAdvertising = false;
-    _nearbyDevices.clear();
+    await _service.stop();
+    _isRunning = false;
+    _devices = [];
+    _connected.clear();
     notifyListeners();
   }
 
-  void addDevice(Map<String, dynamic> device) {
-    final exists = _nearbyDevices.any((d) => d['endpointId'] == device['endpointId']);
-    if (!exists) {
-      _nearbyDevices.add(device);
-      notifyListeners();
-    }
+  /// Envoie un message texte
+  Future<bool> sendText({
+    required String endpointId,
+    required String conversationId,
+    required String text,
+  }) {
+    return _service.sendTextMessage(
+      endpointId: endpointId,
+      conversationId: conversationId,
+      text: text,
+    );
   }
 
-  void removeDevice(String endpointId) {
-    _nearbyDevices.removeWhere((d) => d['endpointId'] == endpointId);
-    _connectedEndpoints.remove(endpointId);
-    notifyListeners();
+  /// Callback pour les messages reçus (à brancher depuis ChatProvider)
+  void setOnMessageReceived(Function(MessageModel) callback) {
+    _service.onMessageReceived = callback;
   }
 }
