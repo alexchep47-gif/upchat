@@ -7,7 +7,7 @@ plugins {
 android {
     namespace = "com.upchat.app"
     compileSdk = 35
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "25.1.8937393"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
