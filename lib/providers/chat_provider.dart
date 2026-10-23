@@ -8,7 +8,6 @@ import '../data/services/storage_service.dart';
 import '../data/services/nearby_service.dart';
 import '../data/services/mesh_service.dart';
 
-/// Gère les conversations et les messages (stockage Hive + envoi P2P + mesh)
 class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
   final NearbyService _nearby = NearbyService();
@@ -16,8 +15,10 @@ class ChatProvider extends ChangeNotifier {
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
+  final Map<String, bool> _typingUsers = {}; // userId → isTyping
 
   List<ConversationModel> get conversations => List.unmodifiable(_conversations);
+  bool isTyping(String userId) => _typingUsers[userId] ?? false;
 
   List<MessageModel> messagesFor(String conversationId) {
     return List.unmodifiable(_messages[conversationId] ?? []);
@@ -26,6 +27,11 @@ class ChatProvider extends ChangeNotifier {
   ChatProvider() {
     _loadFromStorage();
     _nearby.onMessageReceived = _onIncomingMessage;
+    _nearby.onStatusUpdate = _onStatusUpdate;
+    _nearby.onTyping = (userId, typing) {
+      _typingUsers[userId] = typing;
+      notifyListeners();
+    };
     _nearby.onConnected = (endpointId, userId) {
       _mesh.onNewConnection(endpointId, userId);
     };
@@ -59,7 +65,6 @@ class ChatProvider extends ChangeNotifier {
     for (final list in _messages.values) {
       list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
     }
-
     notifyListeners();
   }
 
@@ -77,7 +82,6 @@ class ChatProvider extends ChangeNotifier {
       peerEndpointId: endpointId,
       participantIds: [StorageService.userId, peerId],
     );
-
     _conversations.insert(0, conv);
     StorageService.conversations.put(conv.id, conv.toMap());
     notifyListeners();
@@ -102,7 +106,6 @@ class ChatProvider extends ChangeNotifier {
 
     _addLocalMessage(message, preview: text);
 
-    // Essaie envoi direct, sinon mesh
     bool success = false;
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
@@ -111,9 +114,7 @@ class ChatProvider extends ChangeNotifier {
         text: text,
       );
     }
-
     if (!success) {
-      // Relais mesh vers le destinataire (conversationId = peerId en 1-à-1)
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
         conversationId: conversationId,
@@ -121,7 +122,7 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
+    _updateMessageStatus(message.id, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
   Future<void> sendMediaMessage({
@@ -161,8 +162,6 @@ class ChatProvider extends ChangeNotifier {
         mediaType: type,
       );
     }
-
-    // Mesh pour médias : on relaie au moins le preview texte
     if (!success) {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
@@ -173,7 +172,7 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
+    _updateMessageStatus(message.id, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
   void _addLocalMessage(MessageModel message, {required String preview}) {
@@ -184,19 +183,42 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _updateMessageStatus(MessageModel message, MessageStatus status) {
-    final list = _messages[message.conversationId];
-    if (list == null) return;
-    final index = list.indexWhere((m) => m.id == message.id);
-    if (index == -1) return;
+  void _updateMessageStatus(String messageId, MessageStatus status) {
+    for (final list in _messages.values) {
+      final index = list.indexWhere((m) => m.id == messageId);
+      if (index != -1) {
+        // Ne pas rétrograder (read > delivered > sent)
+        final current = list[index].status;
+        if (_statusRank(status) >= _statusRank(current)) {
+          list[index] = list[index].copyWith(status: status);
+          StorageService.messages.put(messageId, list[index].toMap());
+          notifyListeners();
+        }
+        return;
+      }
+    }
+  }
 
-    list[index] = message.copyWith(status: status);
-    StorageService.messages.put(message.id, list[index].toMap());
-    notifyListeners();
+  int _statusRank(MessageStatus s) {
+    switch (s) {
+      case MessageStatus.sending:
+        return 0;
+      case MessageStatus.failed:
+        return 0;
+      case MessageStatus.sent:
+        return 1;
+      case MessageStatus.delivered:
+        return 2;
+      case MessageStatus.read:
+        return 3;
+    }
+  }
+
+  void _onStatusUpdate(String messageId, MessageStatus status) {
+    _updateMessageStatus(messageId, status);
   }
 
   void _onIncomingMessage(MessageModel message) {
-    // Détecte les payloads mesh
     if (message.content.startsWith('{') && message.content.contains('mesh_relay')) {
       try {
         final map = jsonDecode(message.content) as Map<String, dynamic>;
@@ -207,10 +229,7 @@ class ChatProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
-    getOrCreateConversation(
-      peerId: message.senderId,
-      peerName: message.senderName,
-    );
+    getOrCreateConversation(peerId: message.senderId, peerName: message.senderName);
 
     _messages.putIfAbsent(message.conversationId, () => []);
     if (_messages[message.conversationId]!.any((m) => m.id == message.id)) return;
@@ -237,12 +256,32 @@ class ChatProvider extends ChangeNotifier {
     StorageService.conversations.put(conversationId, updated.toMap());
   }
 
-  void markAsRead(String conversationId) {
+  /// Marque comme lu + envoie les accusés de lecture
+  void markAsRead(String conversationId, {String? endpointId}) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
-    if (index == -1) return;
+    if (index != -1) {
+      _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
+      StorageService.conversations.put(conversationId, _conversations[index].toMap());
+    }
 
-    _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
-    StorageService.conversations.put(conversationId, _conversations[index].toMap());
+    // Envoie les read receipts pour les messages reçus non lus
+    final msgs = _messages[conversationId] ?? [];
+    final unreadIds = msgs
+        .where((m) => !m.isMe && m.status != MessageStatus.read)
+        .map((m) => m.id)
+        .toList();
+
+    if (endpointId != null && unreadIds.isNotEmpty) {
+      _nearby.sendReadReceipts(endpointId, unreadIds);
+      for (final id in unreadIds) {
+        _updateMessageStatus(id, MessageStatus.read);
+      }
+    }
+
     notifyListeners();
+  }
+
+  void sendTyping(String endpointId, bool isTyping) {
+    _nearby.sendTyping(endpointId, isTyping);
   }
 }
