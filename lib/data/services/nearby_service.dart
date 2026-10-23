@@ -14,8 +14,7 @@ import '../models/message_model.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
 
-/// Service central P2P utilisant Nearby Connections (Bluetooth + WiFi Direct)
-/// Gère : découverte, connexion, envoi/réception de messages texte ET médias binaires
+/// Service central P2P (Nearby Connections)
 class NearbyService {
   static final NearbyService _instance = NearbyService._internal();
   factory NearbyService() => _instance;
@@ -28,15 +27,15 @@ class NearbyService {
   bool _isDiscovering = false;
 
   final Map<String, UserModel> _discovered = {};
-  final Map<String, String> _connected = {}; // endpointId → userId
-
-  // Payload ID → métadonnées en attente (pour les fichiers)
+  final Map<String, String> _connected = {};
   final Map<int, Map<String, dynamic>> _pendingPayloads = {};
 
   Function(List<UserModel>)? onDevicesChanged;
   Function(MessageModel)? onMessageReceived;
   Function(String endpointId, String userId)? onConnected;
   Function(String endpointId)? onDisconnected;
+  Function(String messageId, MessageStatus status)? onStatusUpdate;
+  Function(String userId, bool isTyping)? onTyping;
 
   bool get isAdvertising => _isAdvertising;
   bool get isDiscovering => _isDiscovering;
@@ -45,7 +44,6 @@ class NearbyService {
 
   Future<void> start() async {
     final userName = StorageService.userName;
-
     try {
       _isAdvertising = await _nearby.startAdvertising(
         userName,
@@ -60,7 +58,6 @@ class NearbyService {
         userName,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (endpointId, endpointName, serviceId) {
-          debugPrint('Appareil trouvé: $endpointName ($endpointId)');
           _discovered[endpointId] = UserModel(
             id: endpointId,
             name: endpointName,
@@ -118,9 +115,7 @@ class NearbyService {
   }
 
   void _onConnectionResult(String endpointId, Status status) {
-    if (status == Status.CONNECTED) {
-      _sendIdentity(endpointId);
-    }
+    if (status == Status.CONNECTED) _sendIdentity(endpointId);
   }
 
   void _onDisconnected(String endpointId) {
@@ -135,17 +130,13 @@ class NearbyService {
       'name': StorageService.userName,
       'bio': StorageService.userBio,
     });
-    await _nearby.sendBytesPayload(
-      endpointId,
-      Uint8List.fromList(utf8.encode(payload)),
-    );
+    await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(payload)));
   }
 
   void _onPayloadReceived(String endpointId, Payload payload) {
     if (payload.type == PayloadType.BYTES) {
       _handleBytesPayload(endpointId, payload);
     } else if (payload.type == PayloadType.FILE) {
-      // Fichier reçu — on attend la fin du transfert
       _pendingPayloads[payload.id] = {
         'endpointId': endpointId,
         'filePath': payload.filePath,
@@ -158,10 +149,7 @@ class NearbyService {
     if (update.status == PayloadStatus.SUCCESS) {
       final pending = _pendingPayloads.remove(update.id);
       if (pending != null && pending['type'] == 'file') {
-        _handleReceivedFile(
-          endpointId: endpointId,
-          tempPath: pending['filePath'] as String?,
-        );
+        _handleReceivedFile(endpointId: endpointId, tempPath: pending['filePath'] as String?);
       }
     }
   }
@@ -203,9 +191,32 @@ class NearbyService {
           status: MessageStatus.delivered,
         );
         onMessageReceived?.call(message);
+
+        // Accusé de réception automatique
+        _sendAck(endpointId, message.id, MessageStatus.delivered);
+        return;
       }
 
-      // Métadonnées d'un fichier qui va arriver
+      if (type == 'ack') {
+        final messageId = map['messageId'] as String?;
+        final statusName = map['status'] as String?;
+        if (messageId != null && statusName != null) {
+          final status = MessageStatus.values.firstWhere(
+            (e) => e.name == statusName,
+            orElse: () => MessageStatus.sent,
+          );
+          onStatusUpdate?.call(messageId, status);
+        }
+        return;
+      }
+
+      if (type == 'typing') {
+        final userId = map['userId'] as String? ?? endpointId;
+        final isTyping = map['isTyping'] as bool? ?? false;
+        onTyping?.call(userId, isTyping);
+        return;
+      }
+
       if (type == 'media_meta') {
         _pendingPayloads[map['payloadId'] as int? ?? -1] = {
           'endpointId': endpointId,
@@ -218,12 +229,8 @@ class NearbyService {
     }
   }
 
-  Future<void> _handleReceivedFile({
-    required String endpointId,
-    String? tempPath,
-  }) async {
+  Future<void> _handleReceivedFile({required String endpointId, String? tempPath}) async {
     if (tempPath == null || kIsWeb) return;
-
     try {
       final dir = await getApplicationDocumentsDirectory();
       final targetDir = Directory(p.join(dir.path, 'upchat_media', 'received'));
@@ -234,7 +241,6 @@ class NearbyService {
       final target = File(p.join(targetDir.path, filename));
       await File(tempPath).copy(target.path);
 
-      // Crée un message média reçu
       final message = MessageModel(
         id: _uuid.v4(),
         conversationId: _connected[endpointId] ?? endpointId,
@@ -246,8 +252,8 @@ class NearbyService {
         isMe: false,
         status: MessageStatus.delivered,
       );
-
       onMessageReceived?.call(message);
+      _sendAck(endpointId, message.id, MessageStatus.delivered);
     } catch (e) {
       debugPrint('Erreur réception fichier: $e');
     }
@@ -261,27 +267,54 @@ class NearbyService {
     return MessageType.file;
   }
 
-  /// Envoie un message texte
+  /// Envoie un accusé de réception (delivered / read)
+  Future<void> _sendAck(String endpointId, String messageId, MessageStatus status) async {
+    final payload = jsonEncode({
+      'type': 'ack',
+      'messageId': messageId,
+      'status': status.name,
+    });
+    try {
+      await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(payload)));
+    } catch (_) {}
+  }
+
+  /// Notifie que les messages d'une conversation ont été lus
+  Future<void> sendReadReceipts(String endpointId, List<String> messageIds) async {
+    for (final id in messageIds) {
+      await _sendAck(endpointId, id, MessageStatus.read);
+    }
+  }
+
+  /// Indicateur "en train d'écrire"
+  Future<void> sendTyping(String endpointId, bool isTyping) async {
+    final payload = jsonEncode({
+      'type': 'typing',
+      'userId': StorageService.userId,
+      'isTyping': isTyping,
+    });
+    try {
+      await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(payload)));
+    } catch (_) {}
+  }
+
   Future<bool> sendTextMessage({
     required String endpointId,
     required String conversationId,
     required String text,
   }) async {
+    final messageId = _uuid.v4();
     final payload = jsonEncode({
       'type': 'message',
-      'id': _uuid.v4(),
+      'id': messageId,
       'conversationId': conversationId,
       'senderId': StorageService.userId,
       'senderName': StorageService.userName,
       'messageType': MessageType.text.name,
       'content': text,
     });
-
     try {
-      await _nearby.sendBytesPayload(
-        endpointId,
-        Uint8List.fromList(utf8.encode(payload)),
-      );
+      await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(payload)));
       return true;
     } catch (e) {
       debugPrint('Erreur envoi message: $e');
@@ -289,7 +322,6 @@ class NearbyService {
     }
   }
 
-  /// Envoie un fichier média (image, audio, vidéo)
   Future<bool> sendFile({
     required String endpointId,
     required String conversationId,
@@ -297,9 +329,7 @@ class NearbyService {
     required MessageType mediaType,
   }) async {
     if (kIsWeb) return false;
-
     try {
-      // 1. Envoie d'abord les métadonnées
       final meta = jsonEncode({
         'type': 'media_meta',
         'conversationId': conversationId,
@@ -308,17 +338,11 @@ class NearbyService {
         'messageType': mediaType.name,
         'fileName': p.basename(filePath),
       });
-      await _nearby.sendBytesPayload(
-        endpointId,
-        Uint8List.fromList(utf8.encode(meta)),
-      );
-
-      // 2. Envoie le fichier
+      await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(meta)));
       await _nearby.sendFilePayload(endpointId, filePath);
       return true;
     } catch (e) {
       debugPrint('Erreur envoi fichier: $e');
-      // Fallback : envoie juste un texte
       return await sendTextMessage(
         endpointId: endpointId,
         conversationId: conversationId,
@@ -336,11 +360,7 @@ class NearbyService {
     required String text,
   }) async {
     for (final endpointId in _connected.keys) {
-      await sendTextMessage(
-        endpointId: endpointId,
-        conversationId: conversationId,
-        text: text,
-      );
+      await sendTextMessage(endpointId: endpointId, conversationId: conversationId, text: text);
     }
   }
 }
