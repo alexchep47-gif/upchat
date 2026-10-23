@@ -20,17 +20,18 @@ class AppRouter {
   static const String profile = '/profile';
   static const String settings = '/settings';
 
-  static Route<dynamic> onGenerateRoute(RouteSettings settings) {
-    switch (settings.name) {
+  static Route<dynamic> onGenerateRoute(RouteSettings routeSettings) {
+    switch (routeSettings.name) {
       case initialRoute:
       case onboarding:
         return MaterialPageRoute(builder: (_) => const OnboardingScreen());
 
       case home:
-        return MaterialPageRoute(builder: (_) => const ConversationsListScreen());
+        return MaterialPageRoute(
+            builder: (_) => const ConversationsListScreen());
 
       case chat:
-        final args = settings.arguments as Map<String, dynamic>?;
+        final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => ChatScreen(
             conversationId: args?['conversationId'] as String? ?? '',
@@ -46,7 +47,7 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const CreateStoryScreen());
 
       case storyViewer:
-        final args = settings.arguments as Map<String, dynamic>?;
+        final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => StoryViewerScreen(
             userId: args?['userId'] as String? ?? '',
