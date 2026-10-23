@@ -1,0 +1,10 @@
+{
+  "name": "UpChat",
+  "short_name": "UpChat",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#03DAC6",
+  "description": "UpChat — messagerie hors ligne et sécurisée",
+  "orientation": "portrait-primary"
+}

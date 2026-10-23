@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="15000" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" keyTool="0" />
+<dependencies>
+  <deployment identifier="iOS"/>
+  <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="22000"/>
+</dependencies>
+<scenes>
+  <scene sceneID="2">
+    <objects>
+      <viewController id="2" sceneMemberID="2" storyboardIdentifier="LaunchScreen"/>
+    </objects>
+  </scene>
+</scenes>
+</document>
