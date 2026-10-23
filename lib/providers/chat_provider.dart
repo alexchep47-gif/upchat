@@ -75,7 +75,6 @@ class ChatProvider extends ChangeNotifier {
     return conv;
   }
 
-  /// Envoie un message texte
   Future<void> sendTextMessage({
     required String conversationId,
     required String text,
@@ -106,7 +105,7 @@ class ChatProvider extends ChangeNotifier {
     _updateMessageStatus(message, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
-  /// Envoie un média (image / vidéo)
+  /// Envoie un média (image / vidéo / audio) avec transfert binaire
   Future<void> sendMediaMessage({
     required String conversationId,
     required String mediaPath,
@@ -117,7 +116,9 @@ class ChatProvider extends ChangeNotifier {
         ? '📷 Photo'
         : type == MessageType.video
             ? '🎬 Vidéo'
-            : '📎 Fichier';
+            : type == MessageType.audio
+                ? '🎤 Note vocale'
+                : '📎 Fichier';
 
     final message = MessageModel(
       id: _uuid.v4(),
@@ -133,14 +134,13 @@ class ChatProvider extends ChangeNotifier {
 
     _addLocalMessage(message, preview: preview);
 
-    // Pour l'instant on envoie juste le texte de preview via P2P
-    // (transfert de fichiers binaires à améliorer en v2)
     bool success = false;
     if (endpointId != null) {
-      success = await _nearby.sendTextMessage(
+      success = await _nearby.sendFile(
         endpointId: endpointId,
         conversationId: conversationId,
-        text: preview,
+        filePath: mediaPath,
+        mediaType: type,
       );
     }
 

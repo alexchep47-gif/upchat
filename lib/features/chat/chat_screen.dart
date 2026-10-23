@@ -3,10 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/media_helper.dart';
 import '../../data/models/message_model.dart';
+import '../../data/services/voice_service.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/nearby_provider.dart';
 import '../../widgets/empty_state.dart';
@@ -31,6 +33,11 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final VoiceService _voice = VoiceService();
+  final AudioPlayer _player = AudioPlayer();
+
+  bool _isRecording = false;
+  String? _playingId;
 
   @override
   void initState() {
@@ -44,6 +51,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _player.dispose();
     super.dispose();
   }
 
@@ -88,6 +96,50 @@ class _ChatScreenState extends State<ChatScreen> {
         _scrollToBottom();
       },
     );
+  }
+
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      final path = await _voice.stopRecording();
+      setState(() => _isRecording = false);
+
+      if (path != null) {
+        context.read<ChatProvider>().sendMediaMessage(
+              conversationId: widget.conversationId,
+              mediaPath: path,
+              type: MessageType.audio,
+              endpointId: _resolveEndpointId(),
+            );
+        _scrollToBottom();
+      }
+    } else {
+      final ok = await _voice.startRecording();
+      if (ok) {
+        setState(() => _isRecording = true);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Permission micro refusée ou indisponible')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _playAudio(String path, String messageId) async {
+    if (_playingId == messageId) {
+      await _player.stop();
+      setState(() => _playingId = null);
+      return;
+    }
+
+    await _player.stop();
+    await _player.play(DeviceFileSource(path));
+    setState(() => _playingId = messageId);
+
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playingId = null);
+    });
   }
 
   void _scrollToBottom() {
@@ -139,10 +191,33 @@ class _ChatScreenState extends State<ChatScreen> {
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final msg = messages[index];
-                      return _MessageBubble(message: msg, isDark: isDark);
+                      return _MessageBubble(
+                        message: msg,
+                        isDark: isDark,
+                        isPlaying: _playingId == msg.id,
+                        onPlayAudio: msg.type == MessageType.audio && msg.mediaPath != null
+                            ? () => _playAudio(msg.mediaPath!, msg.id)
+                            : null,
+                      );
                     },
                   ),
           ),
+
+          // Indicateur enregistrement
+          if (_isRecording)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              color: Colors.red.withOpacity(0.15),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.mic, color: Colors.red, size: 18),
+                  SizedBox(width: 8),
+                  Text('Enregistrement… (relâche pour envoyer)', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+            ),
 
           // Zone de saisie
           Container(
@@ -159,6 +234,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     child: TextField(
                       controller: _controller,
                       textCapitalization: TextCapitalization.sentences,
+                      enabled: !_isRecording,
                       decoration: const InputDecoration(
                         hintText: 'Message',
                         border: InputBorder.none,
@@ -167,9 +243,35 @@ class _ChatScreenState extends State<ChatScreen> {
                       onSubmitted: (_) => _sendMessage(),
                     ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.send_rounded, color: AppColors.accent),
-                    onPressed: _sendMessage,
+                  // Micro / Stop
+                  GestureDetector(
+                    onLongPressStart: (_) => _toggleRecording(),
+                    onLongPressEnd: (_) {
+                      if (_isRecording) _toggleRecording();
+                    },
+                    onTap: () {
+                      if (_isRecording) {
+                        _toggleRecording();
+                      } else if (_controller.text.trim().isNotEmpty) {
+                        _sendMessage();
+                      } else {
+                        _toggleRecording();
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: _isRecording ? Colors.red : AppColors.accent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        _isRecording
+                            ? Icons.stop
+                            : (_controller.text.trim().isNotEmpty ? Icons.send_rounded : Icons.mic),
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -184,8 +286,15 @@ class _ChatScreenState extends State<ChatScreen> {
 class _MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isDark;
+  final bool isPlaying;
+  final VoidCallback? onPlayAudio;
 
-  const _MessageBubble({required this.message, required this.isDark});
+  const _MessageBubble({
+    required this.message,
+    required this.isDark,
+    this.isPlaying = false,
+    this.onPlayAudio,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -214,7 +323,7 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // Contenu image
+            // Image
             if (message.type == MessageType.image && message.mediaPath != null) ...[
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -241,8 +350,34 @@ class _MessageBubble extends StatelessWidget {
               const SizedBox(height: 4),
             ],
 
-            // Contenu texte / preview
-            if (message.type == MessageType.text || message.mediaPath == null)
+            // Audio
+            if (message.type == MessageType.audio) ...[
+              GestureDetector(
+                onTap: onPlayAudio,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
+                      color: AppColors.primary,
+                      size: 36,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isPlaying ? 'Lecture…' : 'Note vocale',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
+
+            // Texte / preview
+            if (message.type == MessageType.text)
               Text(
                 message.content,
                 style: TextStyle(
