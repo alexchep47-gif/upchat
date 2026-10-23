@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   build-apk:
@@ -48,6 +50,9 @@ jobs:
 
   build-web:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -71,7 +76,19 @@ jobs:
       - name: Build web app
         run: flutter build web --release
 
-      - name: Upload web artifact
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload web artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Upload web build artifact
         uses: actions/upload-artifact@v4
         with:
           name: upchat-web
