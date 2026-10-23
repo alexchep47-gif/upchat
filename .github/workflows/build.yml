@@ -1,4 +1,4 @@
-name: Build APK
+name: Build Android and Web
 
 on:
   push:
@@ -29,8 +29,7 @@ jobs:
 
       - name: Ensure Android platform files
         run: |
-          flutter create --platforms=android . --project-name upchat || true
-          # On ne veut pas écraser nos fichiers custom, donc on force le restore de nos versions
+          flutter create --platforms=android,web . --project-name upchat || true
           git checkout -- android/app/src/main/AndroidManifest.xml || true
           git checkout -- android/app/build.gradle || true
           git checkout -- android/build.gradle || true
@@ -45,4 +44,36 @@ jobs:
         with:
           name: upchat-apk
           path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 30
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.24.5'
+          channel: 'stable'
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Ensure Web platform files
+        run: |
+          flutter create --platforms=web . --project-name upchat || true
+
+      - name: Build web app
+        run: flutter build web --release
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upchat-web
+          path: build/web
           retention-days: 30
