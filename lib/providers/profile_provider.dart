@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../data/services/storage_service.dart';
 
@@ -19,7 +21,19 @@ class ProfileProvider extends ChangeNotifier {
   void _load() {
     _name = StorageService.userName;
     _bio = StorageService.userBio;
-    _photoPath = StorageService.userPhotoPath;
+    final path = StorageService.userPhotoPath;
+    // Vérifie que le fichier existe encore (Android)
+    if (path != null && !kIsWeb) {
+      final file = File(path);
+      if (file.existsSync()) {
+        _photoPath = path;
+      } else {
+        _photoPath = null;
+        StorageService.setUserPhotoPath(null);
+      }
+    } else {
+      _photoPath = path;
+    }
     notifyListeners();
   }
 
@@ -36,6 +50,13 @@ class ProfileProvider extends ChangeNotifier {
   }
 
   Future<void> updatePhoto(String? path) async {
+    if (path != null && !kIsWeb) {
+      final file = File(path);
+      if (!await file.exists()) {
+        debugPrint('ProfileProvider: fichier photo introuvable: $path');
+        return;
+      }
+    }
     _photoPath = path;
     await StorageService.setUserPhotoPath(path);
     notifyListeners();

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/media_service.dart';
 import '../../providers/profile_provider.dart';
+import '../../widgets/profile_avatar.dart';
 
 /// Écran de profil utilisateur
 class ProfileScreen extends StatefulWidget {
@@ -77,6 +78,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (source == 'remove') {
       await context.read<ProfileProvider>().updatePhoto(null);
       if (mounted) {
+        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Photo supprimée')),
         );
@@ -90,15 +92,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final media = MediaService();
       final file = await media.pickImage(fromCamera: source == 'camera');
       if (file != null && mounted) {
+        // Vérifie que le fichier existe bien
+        final exists = await file.exists();
+        if (!exists) {
+          throw Exception('Fichier introuvable');
+        }
         await context.read<ProfileProvider>().updatePhoto(file.path);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Photo de profil mise à jour')),
-        );
+        setState(() {}); // Force le rebuild de l'avatar
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Photo de profil mise à jour')),
+          );
+        }
       }
     } catch (e) {
+      debugPrint('Erreur photo profil: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Impossible de changer la photo')),
+          SnackBar(content: Text('Impossible de changer la photo ($e)')),
         );
       }
     } finally {
@@ -109,7 +120,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>();
-    final hasPhoto = profile.photoPath != null && profile.photoPath!.isNotEmpty && !kIsWeb;
 
     return Scaffold(
       appBar: AppBar(
@@ -131,16 +141,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Center(
             child: Stack(
               children: [
-                CircleAvatar(
+                ProfileAvatar(
+                  name: profile.name,
+                  photoPath: profile.photoPath,
                   radius: 56,
-                  backgroundColor: AppColors.primary,
-                  backgroundImage: hasPhoto ? FileImage(File(profile.photoPath!)) : null,
-                  child: hasPhoto
-                      ? null
-                      : Text(
-                          profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
-                          style: const TextStyle(fontSize: 40, color: Colors.white),
-                        ),
                 ),
                 Positioned(
                   bottom: 0,
@@ -148,6 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Material(
                     color: AppColors.accent,
                     shape: const CircleBorder(),
+                    elevation: 2,
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: _pickingPhoto ? null : _changePhoto,
@@ -178,6 +183,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: Text(_pickingPhoto ? 'Chargement…' : 'Changer la photo'),
             ),
           ),
+          if (profile.photoPath != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                kIsWeb
+                    ? 'Aperçu photo limité sur le web'
+                    : 'Photo enregistrée',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+            ),
           const SizedBox(height: 24),
           TextField(
             controller: _nameController,
