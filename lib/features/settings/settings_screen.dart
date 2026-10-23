@@ -35,6 +35,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(AppConstants.appName),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version ${AppConstants.appVersion}'),
+            const SizedBox(height: 12),
+            const Text(
+              'Messagerie P2P 100 % offline\nBluetooth + WiFi Direct + Mesh',
+              style: TextStyle(height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 8),
+            const Text(
+              AppConstants.authorCredit,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Portée réelle : quelques dizaines de mètres\n'
+              '(Bluetooth / WiFi Direct). Une portée de centaines\n'
+              'de km nécessite internet ou un réseau cellulaire.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = context.watch<ThemeProvider>();
@@ -118,16 +166,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('À propos'),
-            subtitle: Text('${AppConstants.appName} v${AppConstants.appVersion}'),
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: AppConstants.appName,
-                applicationVersion: AppConstants.appVersion,
-                applicationLegalese:
-                    'Messagerie P2P 100 % offline\nBluetooth + WiFi Direct + Mesh',
-              );
-            },
+            subtitle: Text(
+              '${AppConstants.appName} v${AppConstants.appVersion}\n'
+              '${AppConstants.authorName}',
+            ),
+            isThreeLine: true,
+            onTap: _showAbout,
           ),
         ],
       ),
