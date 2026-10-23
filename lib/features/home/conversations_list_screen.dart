@@ -6,7 +6,7 @@ import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../providers/nearby_provider.dart';
 import '../../providers/chat_provider.dart';
-import '../../providers/profile_provider.dart';
+import '../../features/stories/stories_bar.dart';
 import '../../widgets/empty_state.dart';
 
 /// Liste des discussions (style WhatsApp)
@@ -45,6 +45,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 case 'group':
                   Navigator.pushNamed(context, AppRouter.createGroup);
                   break;
+                case 'story':
+                  Navigator.pushNamed(context, AppRouter.createStory);
+                  break;
                 case 'profile':
                   Navigator.pushNamed(context, AppRouter.profile);
                   break;
@@ -54,6 +57,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
               }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(value: 'story', child: Text('Nouvelle story')),
               const PopupMenuItem(value: 'group', child: Text('Nouveau groupe')),
               const PopupMenuItem(value: 'profile', child: Text('Profil')),
               const PopupMenuItem(value: 'settings', child: Text('Réglages')),
@@ -63,18 +67,17 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
       ),
       body: Column(
         children: [
+          // Barre de statut Nearby
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             color: nearby.isRunning
-                ? AppColors.accent.withOpacity(0.15)
-                : Colors.grey.withOpacity(0.1),
+                ? AppColors.accent.withValues(alpha: 0.15)
+                : Colors.grey.withValues(alpha: 0.1),
             child: Row(
               children: [
                 Icon(
-                  nearby.isRunning
-                      ? Icons.bluetooth_searching
-                      : Icons.bluetooth_disabled,
+                  nearby.isRunning ? Icons.bluetooth_searching : Icons.bluetooth_disabled,
                   size: 18,
                   color: nearby.isRunning ? AppColors.accent : Colors.grey,
                 ),
@@ -93,6 +96,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
               ],
             ),
           ),
+
+          // Stories
+          const StoriesBar(),
+
+          const Divider(height: 1),
+
           Expanded(
             child: chat.conversations.isEmpty && nearby.nearbyDevices.isEmpty
                 ? const EmptyState(
@@ -103,6 +112,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                   )
                 : ListView(
                     children: [
+                      // Appareils à proximité
                       if (nearby.nearbyDevices.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
@@ -120,21 +130,24 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                             leading: CircleAvatar(
                               backgroundColor: AppColors.primary,
                               child: Text(
-                                device.name.isNotEmpty
-                                    ? device.name[0].toUpperCase()
-                                    : '?',
+                                device.name.isNotEmpty ? device.name[0].toUpperCase() : '?',
                                 style: const TextStyle(color: Colors.white),
                               ),
                             ),
                             title: Text(device.name),
                             subtitle: const Text('Appareil UpChat à proximité'),
-                            trailing: const Icon(Icons.chat_bubble_outline),
+                            trailing: const Icon(Icons.circle, size: 10, color: AppColors.online),
                             onTap: () {
+                              final conv = context.read<ChatProvider>().getOrCreateConversation(
+                                    peerId: device.id,
+                                    peerName: device.name,
+                                    endpointId: device.endpointId,
+                                  );
                               Navigator.pushNamed(
                                 context,
                                 AppRouter.chat,
                                 arguments: {
-                                  'conversationId': device.id,
+                                  'conversationId': conv.id,
                                   'peerName': device.name,
                                   'peerId': device.id,
                                 },
@@ -144,17 +157,17 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                         }),
                         const Divider(),
                       ],
+
+                      // Conversations existantes
                       ...chat.conversations.map((conv) {
                         final time = conv.lastMessageAt != null
-                            ? DateFormat.Hm().format(conv.lastMessageAt!)
+                            ? DateFormat('HH:mm').format(conv.lastMessageAt!)
                             : '';
                         return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: AppColors.primary,
                             child: Text(
-                              conv.title.isNotEmpty
-                                  ? conv.title[0].toUpperCase()
-                                  : '?',
+                              conv.title.isNotEmpty ? conv.title[0].toUpperCase() : '?',
                               style: const TextStyle(color: Colors.white),
                             ),
                           ),
@@ -168,22 +181,18 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
-                              Text(time,
-                                  style: const TextStyle(
-                                      fontSize: 12, color: Colors.grey)),
+                              Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                               if (conv.unreadCount > 0) ...[
                                 const SizedBox(height: 4),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: AppColors.accent,
                                     borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     '${conv.unreadCount}',
-                                    style: const TextStyle(
-                                        color: Colors.white, fontSize: 11),
+                                    style: const TextStyle(color: Colors.white, fontSize: 11),
                                   ),
                                 ),
                               ],
@@ -208,8 +217,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        child: const Icon(Icons.message_rounded),
+        onPressed: () {
+          Navigator.pushNamed(context, AppRouter.createStory);
+        },
+        child: const Icon(Icons.camera_alt_rounded),
       ),
     );
   }
