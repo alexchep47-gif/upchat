@@ -27,6 +27,16 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Ensure Android platform files
+        run: |
+          flutter create --platforms=android . --project-name upchat || true
+          # On ne veut pas écraser nos fichiers custom, donc on force le restore de nos versions
+          git checkout -- android/app/src/main/AndroidManifest.xml || true
+          git checkout -- android/app/build.gradle || true
+          git checkout -- android/build.gradle || true
+          git checkout -- android/settings.gradle || true
+          git checkout -- android/app/src/main/kotlin/com/upchat/app/MainActivity.kt || true
+
       - name: Build APK (arm64)
         run: flutter build apk --release --target-platform android-arm64 --split-per-abi
 
