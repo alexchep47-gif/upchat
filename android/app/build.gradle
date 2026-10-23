@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.upchat.app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,15 +20,15 @@ android {
 
     defaultConfig {
         applicationId = "com.upchat.app"
-        minSdk = 21
-        targetSdk = flutter.targetSdkVersion
+        minSdk = 23
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // Pour l'instant signature debug (simple pour GitHub Actions)
+            // Signature debug pour simplifier GitHub Actions
             signingConfig = signingConfigs.debug
             minifyEnabled false
             shrinkResources false
