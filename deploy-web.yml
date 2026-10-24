@@ -26,7 +26,6 @@ jobs:
           channel: stable
           cache: true
 
-      # Génère web/ seulement s'il n'existe pas déjà dans le dépôt
       - name: Préparer le projet web
         run: |
           if [ ! -d web ]; then
@@ -36,9 +35,14 @@ jobs:
 
       - run: flutter pub get
 
-      # Le site est servi sur /upchat-web/ : base-href doit correspondre
       - name: Compiler le web
-        run: flutter build web --release --base-href /upchat-web/
+        run: |
+          BUILD_ID="${GITHUB_SHA::12}"
+          flutter build web --release --base-href /upchat-web/
+          if [ -f build/web/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html || true
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html || true
+          fi
 
       - uses: actions/upload-pages-artifact@v3
         with:
