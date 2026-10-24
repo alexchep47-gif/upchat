@@ -27,7 +27,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Sur web : mode internet prioritaire (pas de Bluetooth)
       final connectivity = context.read<ConnectivityProvider>();
       if (kIsWeb && !connectivity.internetModeEnabled) {
         connectivity.setInternetMode(true);
@@ -60,48 +59,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             pinned: true,
             title: const Text('UpChat'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.chat_rounded),
-                tooltip: 'Nouvelle discussion',
-                onPressed: _openNewChat,
-              ),
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded),
-                onSelected: (value) {
-                  switch (value) {
-                    case 'group':
-                      Navigator.pushNamed(context, AppRouter.createGroup);
-                      break;
-                    case 'story':
-                      Navigator.pushNamed(context, AppRouter.createStory);
-                      break;
-                    case 'profile':
-                      Navigator.pushNamed(context, AppRouter.profile);
-                      break;
-                    case 'settings':
-                      Navigator.pushNamed(context, AppRouter.settings);
-                      break;
-                  }
-                },
-                itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'group',
-                    child: Text('Nouveau groupe'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'story',
-                    child: Text('Nouvelle story'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'profile',
-                    child: Text('Profil'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'settings',
-                    child: Text('Réglages'),
-                  ),
-                ],
-              ),
               Padding(
                 padding: const EdgeInsets.only(right: 10, left: 2),
                 child: GestureDetector(
@@ -122,61 +79,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             isDark: isDark,
           ),
 
-          if (kIsWeb)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                child: Material(
-                  color: AppColors.accent.withOpacity(isDark ? 0.18 : 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _openNewChat,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.phone_in_talk_rounded,
-                              color: AppColors.accent),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Discute par numéro',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    color: isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                                Text(
-                                  profile.phoneNumber == null ||
-                                          profile.phoneNumber!.isEmpty
-                                      ? 'Ajoute d’abord ton numéro dans Profil'
-                                      : 'Ton numéro : ${profile.phoneNumber}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.chevron_right_rounded),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
           const SliiverStories(),
 
           if (!hasContent)
@@ -193,35 +95,18 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ],
       ),
 
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!kIsWeb)
-            FloatingActionButton.small(
-              heroTag: 'story_fab',
-              onPressed: () =>
-                  Navigator.pushNamed(context, AppRouter.createStory),
-              backgroundColor: isDark ? Colors.grey.shade800 : Colors.white,
-              foregroundColor: AppColors.primary,
-              child: const Icon(Icons.camera_alt_rounded),
-            ),
-          if (!kIsWeb) const SizedBox(height: 12),
-          FloatingActionButton.extended(
-            heroTag: 'new_chat_fab',
-            onPressed: _openNewChat,
-            backgroundColor: AppColors.accent,
-            foregroundColor: Colors.white,
-            icon: const Icon(Icons.chat_rounded),
-            label: const Text('Nouvelle discussion'),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'new_chat_fab',
+        onPressed: _openNewChat,
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.chat_rounded),
+        label: const Text('Nouvelle discussion'),
       ),
     );
   }
 }
 
-/// Barre de statut (extrait pour alléger le build)
 class SliiverStatusBar extends StatelessWidget {
   final ConnectivityProvider connectivity;
   final NearbyProvider nearby;
@@ -244,8 +129,7 @@ class SliiverStatusBar extends StatelessWidget {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: (connectivity.isHybridReady || kIsWeb
                         ? Colors.blue
@@ -328,8 +212,7 @@ class SliiverEmpty extends StatelessWidget {
             const EmptyState(
               icon: Icons.chat_bubble_outline_rounded,
               title: 'Aucune discussion 💬',
-              subtitle:
-                  'Saisis un numéro pour lancer une conversation.',
+              subtitle: 'Saisis un numéro pour lancer une conversation.',
             ),
             const SizedBox(height: 8),
             if (missingPhone)
@@ -342,22 +225,6 @@ class SliiverEmpty extends StatelessWidget {
                   label: const Text('Enregistrer mon numéro d’abord'),
                 ),
               ),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onNewChat,
-                icon: const Icon(Icons.chat_rounded),
-                label: const Text('Nouvelle discussion'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                ),
-              ),
-            ),
           ],
         ),
       ),
