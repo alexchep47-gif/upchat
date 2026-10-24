@@ -17,6 +17,12 @@ class AppConstants {
 
   // Nearby Connections
   static const String serviceId = 'com.upchat.p2p';
+
+  // Signalisation WebSocket pour la version web cross-platform.
+  static const String signalingUrl = String.fromEnvironment(
+    'UPCHAT_SIGNALING_URL',
+    defaultValue: 'wss://upchat-signal.vercel.app/api/signal',
+  );
   static const String strategy = 'P2P_CLUSTER';
 
   // Durées

@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../models/message_model.dart';
 import 'storage_service.dart';
 
@@ -31,6 +33,10 @@ class InternetService {
   bool _enabled = false;
   bool _isOnline = false;
   bool _isConnectedToSignaling = false;
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _channelSubscription;
+  Timer? _reconnectTimer;
+  int _reconnectAttempt = 0;
 
   // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
@@ -80,28 +86,69 @@ class InternetService {
   }
 
   Future<void> _stop() async {
+    _reconnectTimer?.cancel();
+    await _channelSubscription?.cancel();
+    await _channel?.sink.close();
+    _channel = null;
+    _channelSubscription = null;
     _isConnectedToSignaling = false;
     _onlinePeers.clear();
     debugPrint('InternetService: mode hybride arrêté');
   }
 
-  /// Connexion au canal de signalisation
-  /// (placeholder — brancher WebSocket / PeerJS / ton serveur plus tard)
+  /// Connexion au canal WebSocket de signalisation.
   Future<void> _connectSignaling() async {
+    if (!_enabled || !_isOnline || _isConnectedToSignaling) return;
     try {
-      // TODO: WebSocket vers ton serveur de signalisation
-      // Exemple futur :
-      // final channel = WebSocketChannel.connect(Uri.parse('wss://ton-serveur/signal'));
-      // channel.sink.add(jsonEncode({'type': 'register', 'userId': StorageService.userId}));
-
+      await _channelSubscription?.cancel();
+      await _channel?.sink.close();
+      final channel = WebSocketChannel.connect(Uri.parse(AppConstants.signalingUrl));
+      _channel = channel;
+      await channel.ready;
       _isConnectedToSignaling = true;
-      debugPrint('InternetService: signalisation prête (stub)');
-
-      // Annonce notre présence
-      _onlinePeers[StorageService.userId] = DateTime.now();
-    } catch (e) {
-      debugPrint('InternetService: erreur signalisation: $e');
+      _reconnectAttempt = 0;
+      _send({'type': 'register', 'userId': StorageService.userId, 'userName': StorageService.userName});
+      _channelSubscription = channel.stream.listen(
+        (event) => _handleSignal(event),
+        onError: (Object error, StackTrace stack) => _scheduleReconnect(),
+        onDone: _scheduleReconnect,
+        cancelOnError: true,
+      );
+      debugPrint('InternetService: signalisation connectée');
+    } catch (error) {
       _isConnectedToSignaling = false;
+      debugPrint('InternetService: connexion signalisation impossible: $error');
+      _scheduleReconnect();
+    }
+  }
+
+  void _send(Map<String, dynamic> payload) {
+    if (_isConnectedToSignaling) _channel?.sink.add(jsonEncode(payload));
+  }
+
+  void _scheduleReconnect() {
+    if (!_enabled || !_isOnline || _reconnectTimer?.isActive == true) return;
+    _isConnectedToSignaling = false;
+    final delaySeconds = (_reconnectAttempt++ + 1).clamp(1, 30).toInt();
+    final delay = Duration(seconds: delaySeconds);
+    _reconnectTimer = Timer(delay, _connectSignaling);
+  }
+
+  void _handleSignal(dynamic raw) {
+    try {
+      final map = jsonDecode(raw is String ? raw : utf8.decode(raw as List<int>)) as Map<String, dynamic>;
+      switch (map['type']) {
+        case 'presence':
+          final userId = map['userId'] as String?;
+          if (userId != null && userId != StorageService.userId) {
+            _onlinePeers[userId] = DateTime.now();
+            onPeerPresence?.call(userId, map['online'] != false);
+          }
+        case 'message':
+          if (map['targetUserId'] == StorageService.userId) handleIncoming(map);
+      }
+    } catch (error) {
+      debugPrint('InternetService: payload signal invalide: $error');
     }
   }
 
@@ -138,10 +185,9 @@ class InternetService {
 
   Future<bool> _transmit(Map<String, dynamic> payload) async {
     try {
-      // TODO: envoyer via WebSocket / WebRTC data channel
+      _send(payload);
       debugPrint('InternetService: transmission → ${payload['targetUserId']}');
-      // Simulation locale pour tests : si le destinataire est "nous" (debug)
-      return true;
+      return _isConnectedToSignaling;
     } catch (e) {
       debugPrint('InternetService: échec transmission: $e');
       _outbox.add(payload);
@@ -181,6 +227,7 @@ class InternetService {
 
   /// Réception d'un message depuis le réseau
   void handleIncoming(Map<String, dynamic> map) {
+    if (map['senderId'] == StorageService.userId) return;
     final message = MessageModel(
       id: map['id'] as String? ?? _uuid.v4(),
       conversationId: map['conversationId'] as String? ?? map['senderId'] as String? ?? '',

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_nearby_connections_plus/flutter_nearby_connections_plus.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../data/services/internet_service.dart';
 
 class NearbyDevicesPage extends StatefulWidget {
   const NearbyDevicesPage({super.key});
@@ -15,6 +16,8 @@ class NearbyDevicesPage extends StatefulWidget {
 
 class _NearbyDevicesPageState extends State<NearbyDevicesPage> {
   final NearbyService _nearbyService = NearbyService();
+  final InternetService _internetService = InternetService();
+  final TextEditingController _webPeerController = TextEditingController();
   StreamSubscription? _devicesSubscription;
   StreamSubscription? _messagesSubscription;
   List<Device> _devices = const [];
@@ -39,6 +42,9 @@ class _NearbyDevicesPageState extends State<NearbyDevicesPage> {
         setState(() => _lastMessage = payload.toString());
       },
     );
+    _internetService.onMessageReceived = (message) {
+      if (mounted) setState(() => _lastMessage = '${message.senderName} : ${message.content}');
+    };
     _startDiscovery();
   }
 
@@ -79,8 +85,19 @@ class _NearbyDevicesPageState extends State<NearbyDevicesPage> {
     unawaited(_stopDiscovery());
     _devicesSubscription?.cancel();
     _messagesSubscription?.cancel();
+    _webPeerController.dispose();
     _messageController.dispose();
+    unawaited(_internetService.setEnabled(false));
     super.dispose();
+  }
+
+  Future<void> _sendWebMessage() async {
+    final target = _webPeerController.text.trim();
+    final text = _messageController.text.trim();
+    if (target.isEmpty || text.isEmpty) return;
+    final sent = await _internetService.sendMessage(targetUserId: target, conversationId: target, text: text);
+    if (mounted) setState(() => _lastMessage = sent ? 'Moi : $text' : 'Message mis en attente — reconnexion en cours');
+    if (sent) _messageController.clear();
   }
 
   Future<void> _sendMessage() async {
@@ -129,11 +146,29 @@ class _NearbyDevicesPageState extends State<NearbyDevicesPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Connexion web', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                    Text('Connexion web universelle', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
                     const SizedBox(height: 8),
-                    const Text('Les navigateurs ne permettent pas de scanner directement le Wi‑Fi ou le Bluetooth. Pour connecter deux téléphones avec la version web, ajoute un serveur de signalisation WebRTC et fais rejoindre les deux appareils à la même salle.'),
+                    const Text('iOS ↔ Android, Android ↔ Android et iOS ↔ iOS via une signalisation WebSocket sécurisée. Aucun accès Bluetooth n’est requis dans le navigateur.'),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: () => _internetService.setEnabled(true),
+                      icon: const Icon(Icons.link),
+                      label: const Text('Activer la connexion web'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _webPeerController,
+                      decoration: const InputDecoration(labelText: 'Identifiant UpChat du destinataire', border: OutlineInputBorder()),
+                      autocorrect: false,
+                    ),
                     const SizedBox(height: 8),
-                    Text('La détection native reste active dans les applications Android et iOS.', style: TextStyle(color: Theme.of(context).colorScheme.primary)),
+                    TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(labelText: 'Message', border: OutlineInputBorder()),
+                      onSubmitted: (_) => _sendWebMessage(),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton.icon(onPressed: _sendWebMessage, icon: const Icon(Icons.send), label: const Text('Envoyer via WebSocket')),
                   ],
                 ),
               ),
