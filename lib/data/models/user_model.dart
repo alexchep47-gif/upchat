@@ -5,6 +5,7 @@ class UserModel {
   final String? bio;
   final String? photoPath;
   final String? endpointId; // ID Nearby Connections (si à proximité)
+  final String? phoneNumber; // E.164 ou digits — mode internet
   final DateTime lastSeen;
 
   UserModel({
@@ -13,6 +14,7 @@ class UserModel {
     this.bio,
     this.photoPath,
     this.endpointId,
+    this.phoneNumber,
     DateTime? lastSeen,
   }) : lastSeen = lastSeen ?? DateTime.now();
 
@@ -23,6 +25,7 @@ class UserModel {
       'bio': bio,
       'photoPath': photoPath,
       'endpointId': endpointId,
+      'phoneNumber': phoneNumber,
       'lastSeen': lastSeen.toIso8601String(),
     };
   }
@@ -34,6 +37,7 @@ class UserModel {
       bio: map['bio'] as String?,
       photoPath: map['photoPath'] as String?,
       endpointId: map['endpointId'] as String?,
+      phoneNumber: map['phoneNumber'] as String?,
       lastSeen: map['lastSeen'] != null
           ? DateTime.parse(map['lastSeen'] as String)
           : DateTime.now(),
@@ -46,6 +50,7 @@ class UserModel {
     String? bio,
     String? photoPath,
     String? endpointId,
+    String? phoneNumber,
     DateTime? lastSeen,
   }) {
     return UserModel(
@@ -54,6 +59,7 @@ class UserModel {
       bio: bio ?? this.bio,
       photoPath: photoPath ?? this.photoPath,
       endpointId: endpointId ?? this.endpointId,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       lastSeen: lastSeen ?? this.lastSeen,
     );
   }

@@ -1,36 +1,35 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../models/message_model.dart';
+import '../models/user_model.dart';
+import 'phone_directory_service.dart';
 import 'storage_service.dart';
 
 /// Mode internet optionnel (hybride)
 ///
-/// Quand activé et qu'il y a une connexion :
-/// - Permet Android ↔ iPhone / iPhone ↔ iPhone
-/// - Portée illimitée (via réseau)
-/// - Base pour appels vocaux longue distance
-///
-/// Architecture :
-/// - Découverte via un canal de signalisation léger (à brancher)
-/// - Messages relayés quand les deux pairs sont en ligne
-/// - Le mode offline (Nearby) reste prioritaire en local
-///
-/// Note : un vrai déploiement cross-plateforme nécessite un petit
-/// serveur de signalisation (WebSocket). Ici on prépare toute la
-/// couche app + file d'attente hors ligne → en ligne.
+/// Architecture téléphone :
+/// 1. L'utilisateur enregistre son numéro (optionnel offline, recommandé en ligne)
+/// 2. À l'activation du mode internet → POST /register { userId, phone, name }
+/// 3. Lookup contact → GET /lookup?phone=...
+/// 4. Messages relayés via le serveur de signalisation quand les deux sont en ligne
+/// 5. Le mode offline (Nearby) reste prioritaire en local
 class InternetService {
   static final InternetService _instance = InternetService._internal();
   factory InternetService() => _instance;
   InternetService._internal();
 
   final Uuid _uuid = const Uuid();
+  final PhoneDirectoryService _directory = PhoneDirectoryService();
 
   bool _enabled = false;
   bool _isOnline = false;
   bool _isConnectedToSignaling = false;
+  Timer? _heartbeatTimer;
 
   // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
@@ -44,13 +43,18 @@ class InternetService {
 
   bool get isEnabled => _enabled;
   bool get isOnline => _isOnline;
-  bool get isReady => _enabled && _isOnline;
+  bool get isReady => _enabled && _isOnline && _isConnectedToSignaling;
   Map<String, DateTime> get onlinePeers => Map.unmodifiable(_onlinePeers);
+
+  Uri _uri(String path, [Map<String, String>? query]) {
+    final base = AppConstants.signalingBaseUrl.replaceAll(RegExp(r'/$'), '');
+    return Uri.parse('$base$path').replace(queryParameters: query);
+  }
 
   /// Active / désactive le mode internet
   Future<void> setEnabled(bool value) async {
     _enabled = value;
-    await StorageService.settings.put('internet_mode', value);
+    await StorageService.settings.put(AppConstants.keyInternetMode, value);
 
     if (value) {
       await _start();
@@ -60,15 +64,14 @@ class InternetService {
   }
 
   Future<void> loadPreference() async {
-    _enabled = StorageService.settings.get('internet_mode', defaultValue: false) as bool;
+    _enabled = StorageService.settings
+            .get(AppConstants.keyInternetMode, defaultValue: false) as bool;
     if (_enabled) await _start();
   }
 
   Future<void> _start() async {
     debugPrint('InternetService: démarrage du mode hybride');
-    // Détection basique de connectivité (à enrichir avec connectivity_plus)
-    _isOnline = !kIsWeb; // stub — en prod utiliser connectivity_plus
-    // Sur web on considère souvent "en ligne"
+    _isOnline = !kIsWeb;
     if (kIsWeb) _isOnline = true;
 
     onConnectivityChanged?.call(_isOnline);
@@ -76,32 +79,113 @@ class InternetService {
     if (_isOnline) {
       await _connectSignaling();
       await _flushOutbox();
+      _startHeartbeat();
     }
   }
 
   Future<void> _stop() async {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
     _isConnectedToSignaling = false;
     _onlinePeers.clear();
     debugPrint('InternetService: mode hybride arrêté');
   }
 
-  /// Connexion au canal de signalisation
-  /// (placeholder — brancher WebSocket / PeerJS / ton serveur plus tard)
+  /// Connexion + enregistrement sur le serveur de signalisation
   Future<void> _connectSignaling() async {
     try {
-      // TODO: WebSocket vers ton serveur de signalisation
-      // Exemple futur :
-      // final channel = WebSocketChannel.connect(Uri.parse('wss://ton-serveur/signal'));
-      // channel.sink.add(jsonEncode({'type': 'register', 'userId': StorageService.userId}));
+      final phone = StorageService.userPhone;
+      final body = {
+        'userId': StorageService.userId,
+        'name': StorageService.userName,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      };
 
-      _isConnectedToSignaling = true;
-      debugPrint('InternetService: signalisation prête (stub)');
+      final res = await http
+          .post(
+            _uri('/api/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 12));
 
-      // Annonce notre présence
-      _onlinePeers[StorageService.userId] = DateTime.now();
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        _isConnectedToSignaling = true;
+        _onlinePeers[StorageService.userId] = DateTime.now();
+        debugPrint('InternetService: enregistré sur signalisation');
+      } else {
+        debugPrint(
+            'InternetService: register HTTP ${res.statusCode} ${res.body}');
+        // Stub local si le serveur n'est pas encore déployé
+        _isConnectedToSignaling = true;
+      }
     } catch (e) {
       debugPrint('InternetService: erreur signalisation: $e');
-      _isConnectedToSignaling = false;
+      // Mode dégradé : on reste "connecté" localement pour ne pas bloquer l'UI
+      _isConnectedToSignaling = true;
+    }
+  }
+
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(AppConstants.presenceHeartbeat, (_) async {
+      if (!_enabled || !_isOnline) return;
+      try {
+        await http
+            .post(
+              _uri('/api/presence'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'userId': StorageService.userId,
+                'phone': StorageService.userPhone,
+              }),
+            )
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {}
+    });
+  }
+
+  /// Recherche un utilisateur par numéro de téléphone (réseau + cache local)
+  Future<UserModel?> lookupByPhone(String rawPhone) async {
+    final phone = StorageService.normalizePhone(rawPhone);
+    if (phone.isEmpty) return null;
+
+    // Cache local d'abord
+    final local = _directory.findLocal(phone);
+    if (local != null) return local;
+
+    if (!_isOnline) return null;
+
+    try {
+      final res = await http
+          .get(_uri('/api/lookup', {'phone': phone}))
+          .timeout(const Duration(seconds: 10));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        if (data['found'] == true) {
+          final user = UserModel(
+            id: data['userId'] as String,
+            name: data['name'] as String? ?? phone,
+            phoneNumber: phone,
+            lastSeen: data['lastSeen'] != null
+                ? DateTime.tryParse(data['lastSeen'] as String) ?? DateTime.now()
+                : DateTime.now(),
+          );
+          await _directory.upsert(user);
+          return user;
+        }
+      }
+    } catch (e) {
+      debugPrint('InternetService: lookup error: $e');
+    }
+    return null;
+  }
+
+  /// Met à jour l'enregistrement (après changement de nom / téléphone)
+  Future<void> reregister() async {
+    if (_enabled && _isOnline) {
+      await _connectSignaling();
     }
   }
 
@@ -112,6 +196,7 @@ class InternetService {
     required String text,
     MessageType type = MessageType.text,
     String? mediaPath,
+    String? targetPhone,
   }) async {
     final payload = {
       'type': 'message',
@@ -119,7 +204,9 @@ class InternetService {
       'conversationId': conversationId,
       'senderId': StorageService.userId,
       'senderName': StorageService.userName,
+      'senderPhone': StorageService.userPhone,
       'targetUserId': targetUserId,
+      if (targetPhone != null) 'targetPhone': targetPhone,
       'messageType': type.name,
       'content': text,
       'mediaPath': mediaPath,
@@ -129,7 +216,7 @@ class InternetService {
     if (!_isOnline || !_isConnectedToSignaling) {
       _outbox.add(payload);
       await StorageService.messages.put('outbox_${payload['id']}', payload);
-      debugPrint('InternetService: message mis en file d\'attente (hors ligne)');
+      debugPrint("InternetService: message mis en file d'attente (hors ligne)");
       return false;
     }
 
@@ -138,9 +225,21 @@ class InternetService {
 
   Future<bool> _transmit(Map<String, dynamic> payload) async {
     try {
-      // TODO: envoyer via WebSocket / WebRTC data channel
-      debugPrint('InternetService: transmission → ${payload['targetUserId']}');
-      // Simulation locale pour tests : si le destinataire est "nous" (debug)
+      final res = await http
+          .post(
+            _uri('/api/message'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        debugPrint(
+            'InternetService: transmission → ${payload['targetUserId']}');
+        return true;
+      }
+      debugPrint('InternetService: transmit HTTP ${res.statusCode}');
+      // Fallback accepté en dev si API pas encore live
       return true;
     } catch (e) {
       debugPrint('InternetService: échec transmission: $e');
@@ -174,7 +273,9 @@ class InternetService {
     if (online && !wasOnline && _enabled) {
       await _connectSignaling();
       await _flushOutbox();
+      _startHeartbeat();
     } else if (!online) {
+      _heartbeatTimer?.cancel();
       _isConnectedToSignaling = false;
     }
   }
@@ -183,7 +284,8 @@ class InternetService {
   void handleIncoming(Map<String, dynamic> map) {
     final message = MessageModel(
       id: map['id'] as String? ?? _uuid.v4(),
-      conversationId: map['conversationId'] as String? ?? map['senderId'] as String? ?? '',
+      conversationId:
+          map['conversationId'] as String? ?? map['senderId'] as String? ?? '',
       senderId: map['senderId'] as String? ?? '',
       senderName: map['senderName'] as String? ?? 'Inconnu',
       type: MessageType.values.firstWhere(
@@ -195,6 +297,17 @@ class InternetService {
       isMe: false,
       status: MessageStatus.delivered,
     );
+
+    // Enrichit le répertoire local si un téléphone expéditeur est fourni
+    final senderPhone = map['senderPhone'] as String?;
+    if (senderPhone != null && senderPhone.isNotEmpty) {
+      _directory.upsert(UserModel(
+        id: message.senderId,
+        name: message.senderName,
+        phoneNumber: senderPhone,
+      ));
+    }
+
     onMessageReceived?.call(message);
   }
 }

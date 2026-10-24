@@ -1,13 +1,14 @@
 /// Constantes globales de l'application UpChat
 class AppConstants {
   static const String appName = 'UpChat';
-  static const String appVersion = '1.2.0';
+  static const String appVersion = '1.3.0';
   static const String appTagline = 'Messagerie 100 % offline';
 
   // Auteur
   static const String authorName = 'NEMMEGNE CHEPING ALEXANDRE MERVIN';
   static const String authorNationality = 'Camerounaise';
-  static const String authorCredit = 'Créé par NEMMEGNE CHEPING ALEXANDRE MERVIN\nNationalité : Camerounaise';
+  static const String authorCredit =
+      'Créé par NEMMEGNE CHEPING ALEXANDRE MERVIN\nNationalité : Camerounaise';
 
   // Couleurs WhatsApp-like
   static const int primaryGreen = 0xFF128C7E;
@@ -19,10 +20,16 @@ class AppConstants {
   static const String serviceId = 'com.upchat.p2p';
   static const String strategy = 'P2P_CLUSTER';
 
+  // Signalisation mode internet (Vercel)
+  // Remplace par ton URL de déploiement upchat-signal si différente
+  static const String signalingBaseUrl =
+      'https://upchat-signal.vercel.app';
+
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);
   static const Duration discoveryTimeout = Duration(seconds: 30);
   static const Duration mediaRetention = Duration(days: 7);
+  static const Duration presenceHeartbeat = Duration(seconds: 45);
 
   // Limites
   static const int maxImageSizeKb = 800;
@@ -35,7 +42,9 @@ class AppConstants {
   static const String keyUserName = 'user_name';
   static const String keyUserBio = 'user_bio';
   static const String keyUserPhoto = 'user_photo';
+  static const String keyUserPhone = 'user_phone';
   static const String keyThemeMode = 'theme_mode';
   static const String keyOnboardingDone = 'onboarding_done';
   static const String keyEncryptionKey = 'encryption_key';
+  static const String keyInternetMode = 'internet_mode';
 }
