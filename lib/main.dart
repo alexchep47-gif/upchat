@@ -63,10 +63,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
           return const _StartupScreen();
         }
         if (snapshot.hasError) {
-          return _StartupError(
-            error: snapshot.error,
-            onRetry: _retry,
-          );
+          return _StartupError(error: snapshot.error, onRetry: _retry);
         }
         return const UpChatApp();
       },
@@ -79,28 +76,52 @@ class _StartupScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: Color(0xFF0E1621),
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              _StartupLogo(),
-              SizedBox(height: 24),
-              SizedBox(
-                width: 34,
-                height: 34,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                  color: Color(0xFF2AABEE),
+              Center(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.92, end: 1),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutBack,
+                  builder: (context, scale, child) => Transform.scale(
+                    scale: scale,
+                    child: child,
+                  ),
+                  child: const _StartupLogo(),
                 ),
               ),
-              SizedBox(height: 16),
-              Text(
-                'Préparation de UpChat…',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: 32,
+                child: Column(
+                  children: [
+                    const Text(
+                      'UpChat',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      'Messagerie privée',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.42),
+                        fontSize: 13,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -116,19 +137,76 @@ class _StartupLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 78,
-      height: 78,
-      decoration: const BoxDecoration(
-        color: Color(0xFF2AABEE),
+      width: 116,
+      height: 116,
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2AABEE), Color(0xFF1769AA)],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2AABEE).withOpacity(0.28),
+            blurRadius: 34,
+            spreadRadius: 5,
+          ),
+        ],
       ),
-      child: const Icon(
-        Icons.forum_rounded,
-        color: Colors.white,
-        size: 42,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 76,
+            height: 58,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.96),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: CustomPaint(painter: _BubbleTailPainter()),
+          ),
+          const Positioned(
+            right: 27,
+            bottom: 27,
+            child: Icon(
+              Icons.bolt_rounded,
+              color: Color(0xFF2AABEE),
+              size: 30,
+            ),
+          ),
+          Positioned(
+            top: 27,
+            left: 28,
+            child: Container(
+              width: 28,
+              height: 5,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2AABEE),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _BubbleTailPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white.withOpacity(0.96);
+    final path = Path()
+      ..moveTo(16, size.height - 3)
+      ..lineTo(4, size.height + 15)
+      ..lineTo(28, size.height - 6)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StartupError extends StatelessWidget {
@@ -142,7 +220,7 @@ class _StartupError extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: const Color(0xFF0E1621),
+        backgroundColor: Colors.black,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
