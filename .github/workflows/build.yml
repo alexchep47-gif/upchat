@@ -145,3 +145,25 @@ jobs:
           git commit -m "Deploy UpChat ${VER} ${{ github.sha }}" || echo "Nothing to commit"
           git push origin main
           echo "Deployed ${VER} to upchat-web/app — Vercel auto-deploy"
+
+  build-ios:
+    name: iOS IPA
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ipa --release --obfuscate --split-debug-info=./symbols --no-codesign
+      # The unsigned IPA is downloadable from the workflow run.
+      # Signing and provisioning are intentionally left to the App Store/enterprise pipeline.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-native-ipa
+          path: |
+            build/ios/ipa/*.ipa
+            symbols/**
+          if-no-files-found: error
+          retention-days: 14
