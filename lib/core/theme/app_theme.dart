@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_colors.dart';
 
-/// Thèmes clair et sombre OLED pour UpChat
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
@@ -17,36 +16,39 @@ class AppTheme {
         error: AppColors.error,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.surfaceLight,
+        foregroundColor: AppColors.textPrimaryLight,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: TextStyle(
-          color: Colors.white,
+          color: AppColors.textPrimaryLight,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surfaceLight,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textSecondaryLight,
+        elevation: 4,
       ),
       dividerColor: AppColors.dividerLight,
       textTheme: _textTheme(AppColors.textPrimaryLight, AppColors.textSecondaryLight),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.grey.shade100,
+        fillColor: const Color(0xFFF1F5F9),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      cardTheme: CardTheme(
+        elevation: 0,
+        color: AppColors.surfaceLight,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
@@ -67,43 +69,46 @@ class AppTheme {
         backgroundColor: AppColors.surfaceDark,
         foregroundColor: AppColors.textPrimaryDark,
         elevation: 0,
+        scrolledUnderElevation: 0.5,
         centerTitle: false,
         systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimaryDark,
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
         ),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: AppColors.accent,
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-      ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surfaceDark,
-        selectedItemColor: AppColors.accent,
-        unselectedItemColor: AppColors.textSecondaryDark,
+        elevation: 4,
       ),
       dividerColor: AppColors.dividerDark,
       textTheme: _textTheme(AppColors.textPrimaryDark, AppColors.textSecondaryDark),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceDark,
+        fillColor: AppColors.surfaceElevatedDark,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(22),
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+      cardTheme: CardTheme(
+        elevation: 0,
+        color: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
   }
 
   static TextTheme _textTheme(Color primary, Color secondary) {
     return TextTheme(
-      bodyLarge: TextStyle(color: primary, fontSize: 16),
-      bodyMedium: TextStyle(color: primary, fontSize: 14),
+      bodyLarge: TextStyle(color: primary, fontSize: 16, height: 1.35),
+      bodyMedium: TextStyle(color: primary, fontSize: 14, height: 1.35),
       bodySmall: TextStyle(color: secondary, fontSize: 12),
-      titleLarge: TextStyle(color: primary, fontSize: 20, fontWeight: FontWeight.w600),
+      titleLarge: TextStyle(color: primary, fontSize: 20, fontWeight: FontWeight.w700),
       titleMedium: TextStyle(color: primary, fontSize: 16, fontWeight: FontWeight.w600),
       titleSmall: TextStyle(color: primary, fontSize: 14, fontWeight: FontWeight.w500),
     );
