@@ -84,8 +84,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           if (!hasContent)
             SliiverEmpty(
               onNewChat: _openNewChat,
-              missingPhone: profile.phoneNumber == null ||
-                  profile.phoneNumber!.isEmpty,
             )
           else
             SliiverConversations(
@@ -95,14 +93,16 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ],
       ),
 
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'new_chat_fab',
-        onPressed: _openNewChat,
-        backgroundColor: AppColors.accent,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.chat_rounded),
-        label: const Text('Nouvelle discussion'),
-      ),
+      floatingActionButton: hasContent
+          ? FloatingActionButton.extended(
+              heroTag: 'new_chat_fab',
+              onPressed: _openNewChat,
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.chat_rounded),
+              label: const Text('Démarrer une discussion'),
+            )
+          : null,
     );
   }
 }
@@ -192,12 +192,10 @@ class SliiverStories extends StatelessWidget {
 
 class SliiverEmpty extends StatelessWidget {
   final VoidCallback onNewChat;
-  final bool missingPhone;
 
   const SliiverEmpty({
     super.key,
     required this.onNewChat,
-    required this.missingPhone,
   });
 
   @override
@@ -214,18 +212,23 @@ class SliiverEmpty extends StatelessWidget {
               title: 'Aucune discussion 💬',
               subtitle: 'Saisis un numéro pour lancer une conversation.',
             ),
-            const SizedBox(height: 8),
-            if (missingPhone)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: TextButton.icon(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, AppRouter.profile),
-                  icon: const Icon(Icons.phone_android),
-                  label: const Text('Enregistrer mon numéro d’abord'),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onNewChat,
+                icon: const Icon(Icons.chat_rounded),
+                label: const Text('Démarrer une discussion'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
                 ),
               ),
-          ],
+            ),
         ),
       ),
     );

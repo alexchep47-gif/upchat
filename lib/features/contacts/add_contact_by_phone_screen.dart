@@ -139,7 +139,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final known = _directory.all();
     final profile = context.watch<ProfileProvider>();
     final hasMyPhone =
         profile.phoneNumber != null && profile.phoneNumber!.isNotEmpty;
@@ -277,46 +276,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
             ),
           ),
 
-          if (known.isNotEmpty) ...[
-            const SizedBox(height: 32),
-            const Text(
-              'Contacts récents',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
-            ...known.map((u) {
-              return ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primary.withOpacity(0.15),
-                  child: Text(
-                    u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                        color: AppColors.primary, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                title: Text(u.name),
-                subtitle: Text(u.phoneNumber ?? ''),
-                trailing: const Icon(Icons.chat_bubble_outline, size: 20),
-                onTap: () {
-                  final conv =
-                      context.read<ChatProvider>().getOrCreateConversation(
-                            peerId: u.id,
-                            peerName: u.name,
-                          );
-                  Navigator.pushNamed(
-                    context,
-                    AppRouter.chat,
-                    arguments: {
-                      'conversationId': conv.id,
-                      'peerName': u.name,
-                      'peerId': u.id,
-                    },
-                  );
-                },
-              );
-            }),
-          ],
         ],
       ),
     );
