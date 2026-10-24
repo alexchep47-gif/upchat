@@ -1,6 +1,6 @@
-import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
@@ -9,7 +9,6 @@ import '../../core/theme/app_colors.dart';
 import '../../providers/nearby_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/connectivity_provider.dart';
-import '../../providers/profile_provider.dart';
 import '../../features/stories/stories_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/profile_avatar.dart';
@@ -23,6 +22,8 @@ class ConversationsListScreen extends StatefulWidget {
 }
 
 class _ConversationsListScreenState extends State<ConversationsListScreen> {
+  int _selectedTab = 0;
+
   @override
   void initState() {
     super.initState();
@@ -41,277 +42,460 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     Navigator.pushNamed(context, AppRouter.addContactByPhone);
   }
 
+  void _openProfile() {
+    Navigator.pushNamed(context, AppRouter.profile);
+  }
+
+  void _openSettings() {
+    Navigator.pushNamed(context, AppRouter.settings);
+  }
+
+  void _showNearbyStatus() {
+    final nearby = context.read<NearbyProvider>();
+    final message = nearby.nearbyDevices.isEmpty
+        ? 'Aucun appareil proche pour le moment.'
+        : '${nearby.nearbyDevices.length} appareil(s) proche(s) disponible(s).';
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final nearby = context.watch<NearbyProvider>();
     final chat = context.watch<ChatProvider>();
     final connectivity = context.watch<ConnectivityProvider>();
-    final profile = context.watch<ProfileProvider>();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasContent =
-        chat.conversations.isNotEmpty || nearby.nearbyDevices.isNotEmpty;
+    final peopleCount = chat.conversations.where((c) => !c.isGroup).length;
+    final groupCount = chat.conversations.where((c) => c.isGroup).length;
+    final nearbyCount = nearby.nearbyDevices.length;
+    final hasContent = chat.conversations.isNotEmpty || nearbyCount > 0;
 
-    return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            floating: true,
-            pinned: true,
-            title: const Text('UpChat'),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 10, left: 2),
-                child: GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, AppRouter.profile),
-                  child: ProfileAvatar(
-                    name: profile.name,
-                    photoPath: profile.photoPath,
-                    radius: 15,
-                  ),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: AppColors.backgroundDark,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundDark,
+        body: SafeArea(
+          bottom: false,
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _HomeHeader(
+                  onProfile: _openProfile,
+                  onNearby: _showNearbyStatus,
+                  onNewChat: _openNewChat,
                 ),
               ),
+              SliverToBoxAdapter(
+                child: _ConversationTabs(
+                  selectedIndex: _selectedTab,
+                  peopleCount: peopleCount,
+                  groupCount: groupCount,
+                  nearbyCount: nearbyCount,
+                  onChanged: (index) => setState(() => _selectedTab = index),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: _InfoBanner(
+                  connectivity: connectivity,
+                  nearby: nearby,
+                ),
+              ),
+              const SliverToBoxAdapter(child: StoriesBar()),
+              if (!hasContent)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _EmptyConversationState(onNewChat: _openNewChat),
+                )
+              else
+                _ConversationSliver(
+                  nearby: nearby,
+                  chat: chat,
+                  selectedTab: _selectedTab,
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 92)),
             ],
           ),
-
-          SliiverStatusBar(
-            connectivity: connectivity,
-            nearby: nearby,
-            isDark: isDark,
-          ),
-
-          const SliiverStories(),
-
-          if (!hasContent)
-            SliiverEmpty(
-              onNewChat: _openNewChat,
-            )
-          else
-            SliiverConversations(
-              nearby: nearby,
-              chat: chat,
-            ),
-        ],
-      ),
-
-      floatingActionButton: hasContent
-          ? FloatingActionButton.extended(
-              heroTag: 'new_chat_fab',
-              onPressed: _openNewChat,
-              backgroundColor: AppColors.accent,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.chat_rounded),
-              label: const Text('Démarrer une discussion'),
-            )
-          : null,
-    );
-  }
-}
-
-class SliiverStatusBar extends StatelessWidget {
-  final ConnectivityProvider connectivity;
-  final NearbyProvider nearby;
-  final bool isDark;
-
-  const SliiverStatusBar({
-    super.key,
-    required this.connectivity,
-    required this.nearby,
-    required this.isDark,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: (connectivity.isHybridReady || kIsWeb
-                        ? Colors.blue
-                        : nearby.isRunning
-                            ? AppColors.accent
-                            : Colors.grey)
-                    .withOpacity(isDark ? 0.15 : 0.12),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.white.withOpacity(isDark ? 0.06 : 0.4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Text(
-                    kIsWeb || connectivity.isHybridReady
-                        ? '🌐'
-                        : nearby.isRunning
-                            ? '📡'
-                            : '💤',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      kIsWeb
-                          ? 'Mode internet — discussions par numéro'
-                          : connectivity.isHybridReady
-                              ? 'Mode hybride — local + internet'
-                              : nearby.isRunning
-                                  ? 'Offline — ${nearby.nearbyDevices.length} appareil(s) proche(s)'
-                                  : connectivity.statusLabel,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimaryLight,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        ),
+        bottomNavigationBar: _BottomNavigation(
+          selectedIndex: 2,
+          onProfile: _openProfile,
+          onNearby: _showNearbyStatus,
+          onHome: () => setState(() => _selectedTab = 0),
+          onSettings: _openSettings,
         ),
       ),
     );
   }
 }
 
-class SliiverStories extends StatelessWidget {
-  const SliiverStories({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SliverToBoxAdapter(child: StoriesBar());
-  }
-}
-
-class SliiverEmpty extends StatelessWidget {
+class _HomeHeader extends StatelessWidget {
+  final VoidCallback onProfile;
+  final VoidCallback onNearby;
   final VoidCallback onNewChat;
 
-  const SliiverEmpty({
-    super.key,
+  const _HomeHeader({
+    required this.onProfile,
+    required this.onNearby,
     required this.onNewChat,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SliverFillRemaining(
-      hasScrollBody: false,
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const EmptyState(
-              icon: Icons.chat_bubble_outline_rounded,
-              title: 'Aucune discussion 💬',
-              subtitle: 'Saisis un numéro pour lancer une conversation.',
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 14),
+      child: Row(
+        children: [
+          OutlinedButton(
+            onPressed: onProfile,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textPrimaryDark,
+              side: BorderSide(color: Colors.white.withOpacity(0.18)),
+              padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: onNewChat,
-                icon: const Icon(Icons.chat_rounded),
-                label: const Text('Démarrer une discussion'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                  ),
+            child: const Text('Modifier'),
+          ),
+          const Expanded(
+            child: Center(
+              child: Text(
+                'Échanges',
+                style: TextStyle(
+                  color: AppColors.textPrimaryDark,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.4,
                 ),
               ),
             ),
-          ],
+          ),
+          _HeaderIconButton(
+            icon: Icons.radar_rounded,
+            tooltip: 'Appareils proches',
+            onPressed: onNearby,
+          ),
+          const SizedBox(width: 8),
+          _HeaderIconButton(
+            icon: Icons.edit_square,
+            tooltip: 'Nouvelle discussion',
+            onPressed: onNewChat,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _HeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: IconButton(
+        onPressed: onPressed,
+        icon: Icon(icon, size: 25),
+        color: AppColors.textPrimaryDark,
+        style: IconButton.styleFrom(
+          side: BorderSide(color: Colors.white.withOpacity(0.18)),
+          shape: const CircleBorder(),
+          padding: const EdgeInsets.all(11),
         ),
       ),
     );
   }
 }
 
-class SliiverConversations extends StatelessWidget {
-  final NearbyProvider nearby;
-  final ChatProvider chat;
+class _ConversationTabs extends StatelessWidget {
+  final int selectedIndex;
+  final int peopleCount;
+  final int groupCount;
+  final int nearbyCount;
+  final ValueChanged<int> onChanged;
 
-  const SliiverConversations({
-    super.key,
-    required this.nearby,
-    required this.chat,
+  const _ConversationTabs({
+    required this.selectedIndex,
+    required this.peopleCount,
+    required this.groupCount,
+    required this.nearbyCount,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SliverList(
-      delegate: SliverChildListDelegate([
-        if (!kIsWeb && nearby.nearbyDevices.isNotEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: Text(
-              'À proximité ✨',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-                fontSize: 13,
-                letterSpacing: 0.2,
+    final tabs = [
+      const _TabData('Tous'),
+      _TabData('Personnel', peopleCount),
+      _TabData('Groupes', groupCount),
+      _TabData('Proches', nearbyCount),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        borderRadius: BorderRadius.circular(28),
+        color: Colors.white.withOpacity(0.025),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < tabs.length; i++)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => onChanged(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selectedIndex == i
+                        ? Colors.white.withOpacity(0.14)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(23),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          tabs[i].label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.textPrimaryDark,
+                            fontSize: 14,
+                            fontWeight: selectedIndex == i
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      if (tabs[i].count != null && tabs[i].count! > 0) ...[
+                        const SizedBox(width: 5),
+                        _CountBadge(value: tabs[i].count!),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ),
-          ),
-          ...nearby.nearbyDevices.map((device) {
-            return _ConversationTile(
-              title: device.name,
-              subtitle: '🟢 En ligne · à proximité',
-              onTap: () {
-                final conv =
-                    context.read<ChatProvider>().getOrCreateConversation(
-                          peerId: device.id,
-                          peerName: device.name,
-                          endpointId: device.endpointId,
-                        );
-                Navigator.pushNamed(
-                  context,
-                  AppRouter.chat,
-                  arguments: {
-                    'conversationId': conv.id,
-                    'peerName': device.name,
-                    'peerId': device.id,
-                  },
-                );
-              },
-            );
-          }),
-          const Divider(height: 24),
         ],
-        ...chat.conversations.map((conv) {
-          final time = conv.lastMessageAt != null
-              ? DateFormat('HH:mm').format(conv.lastMessageAt!)
-              : '';
-          return _ConversationTile(
-            title: conv.title,
-            subtitle: conv.lastMessage ?? '',
-            time: time,
-            unread: conv.unreadCount,
+      ),
+    );
+  }
+}
+
+class _TabData {
+  final String label;
+  final int? count;
+
+  const _TabData(this.label, [this.count]);
+}
+
+class _CountBadge extends StatelessWidget {
+  final int value;
+
+  const _CountBadge({required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '$value',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  final ConnectivityProvider connectivity;
+  final NearbyProvider nearby;
+
+  const _InfoBanner({
+    required this.connectivity,
+    required this.nearby,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = kIsWeb || connectivity.isHybridReady
+        ? 'Mode internet activé'
+        : nearby.isRunning
+            ? 'Appareils proches disponibles'
+            : 'Votre espace de discussions';
+    final subtitle = kIsWeb || connectivity.isHybridReady
+        ? 'Les contacts peuvent être trouvés par numéro.'
+        : nearby.isRunning
+            ? '${nearby.nearbyDevices.length} appareil(s) détecté(s) autour de vous.'
+            : 'Démarrez une discussion avec un contact.';
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      padding: const EdgeInsets.fromLTRB(16, 13, 12, 13),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        borderRadius: BorderRadius.circular(18),
+        color: AppColors.surfaceDark,
+      ),
+      child: Row(
+        children: [
+          Icon(
+            kIsWeb || connectivity.isHybridReady
+                ? Icons.public_rounded
+                : Icons.wifi_tethering_rounded,
+            color: AppColors.primary,
+            size: 25,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.textPrimaryDark,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    color: AppColors.textSecondaryDark,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            connectivity.isHybridReady || kIsWeb
+                ? Icons.check_circle_rounded
+                : Icons.info_outline_rounded,
+            color: connectivity.isHybridReady || kIsWeb
+                ? AppColors.online
+                : AppColors.textSecondaryDark,
+            size: 21,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConversationSliver extends StatelessWidget {
+  final NearbyProvider nearby;
+  final ChatProvider chat;
+  final int selectedTab;
+
+  const _ConversationSliver({
+    required this.nearby,
+    required this.chat,
+    required this.selectedTab,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <Widget>[];
+    final showNearby = selectedTab == 0 || selectedTab == 3;
+    final showPeople = selectedTab == 0 || selectedTab == 1;
+    final showGroups = selectedTab == 0 || selectedTab == 2;
+
+    if (showNearby && !kIsWeb) {
+      for (final device in nearby.nearbyDevices) {
+        entries.add(
+          _ConversationTile(
+            title: device.name,
+            subtitle: 'En ligne · à proximité',
+            status: 'maintenant',
+            isOnline: true,
             onTap: () {
+              final conv = context.read<ChatProvider>().getOrCreateConversation(
+                    peerId: device.id,
+                    peerName: device.name,
+                    endpointId: device.endpointId,
+                  );
               Navigator.pushNamed(
                 context,
                 AppRouter.chat,
                 arguments: {
                   'conversationId': conv.id,
-                  'peerName': conv.title,
-                  'peerId': conv.id,
+                  'peerName': device.name,
+                  'peerId': device.id,
                 },
               );
             },
-          );
-        }),
-        const SizedBox(height: 100),
-      ]),
+          ),
+        );
+      }
+    }
+
+    for (final conv in chat.conversations) {
+      if (conv.isGroup && !showGroups) continue;
+      if (!conv.isGroup && !showPeople) continue;
+      entries.add(
+        _ConversationTile(
+          title: conv.title,
+          subtitle: conv.lastMessage ?? 'Aucune activité récente',
+          status: conv.lastMessageAt == null
+              ? ''
+              : DateFormat('HH:mm').format(conv.lastMessageAt!),
+          unread: conv.unreadCount,
+          isGroup: conv.isGroup,
+          photoPath: conv.photoPath,
+          onTap: () {
+            Navigator.pushNamed(
+              context,
+              AppRouter.chat,
+              arguments: {
+                'conversationId': conv.id,
+                'peerName': conv.title,
+                'peerId': conv.id,
+              },
+            );
+          },
+        ),
+      );
+    }
+
+    if (entries.isEmpty) {
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Text(
+            'Aucune discussion dans cette catégorie',
+            style: TextStyle(color: AppColors.textSecondaryDark),
+          ),
+        ),
+      );
+    }
+
+    return SliverList(
+      delegate: SliverChildListDelegate(entries),
     );
   }
 }
@@ -319,43 +503,68 @@ class SliiverConversations extends StatelessWidget {
 class _ConversationTile extends StatelessWidget {
   final String title;
   final String subtitle;
-  final String time;
+  final String status;
   final int unread;
+  final bool isOnline;
+  final bool isGroup;
+  final String? photoPath;
   final VoidCallback onTap;
 
   const _ConversationTile({
     required this.title,
     required this.subtitle,
-    this.time = '',
-    this.unread = 0,
+    required this.status,
     required this.onTap,
+    this.unread = 0,
+    this.isOnline = false,
+    this.isGroup = false,
+    this.photoPath,
   });
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withOpacity(0.09)),
+            ),
+          ),
           child: Row(
             children: [
-              CircleAvatar(
-                radius: 26,
-                backgroundColor: AppColors.primary.withOpacity(0.15),
-                child: Text(
-                  title.isNotEmpty ? title[0].toUpperCase() : '?',
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ProfileAvatar(
+                    name: title,
+                    photoPath: photoPath,
+                    radius: 27,
                   ),
-                ),
+                  if (isOnline)
+                    Positioned(
+                      right: -1,
+                      bottom: -1,
+                      child: Container(
+                        width: 15,
+                        height: 15,
+                        decoration: BoxDecoration(
+                          color: AppColors.online,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.backgroundDark,
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -365,69 +574,56 @@ class _ConversationTile extends StatelessWidget {
                         Expanded(
                           child: Text(
                             title,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 16,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
-                            ),
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textPrimaryDark,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                        if (time.isNotEmpty)
+                        if (status.isNotEmpty)
                           Text(
-                            time,
+                            status,
                             style: TextStyle(
-                              fontSize: 12,
                               color: unread > 0
                                   ? AppColors.primary
-                                  : (isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight),
+                                  : AppColors.textSecondaryDark,
+                              fontSize: 12,
                               fontWeight: unread > 0
-                                  ? FontWeight.w600
+                                  ? FontWeight.w700
                                   : FontWeight.w400,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 3),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
+                        if (isGroup) ...[
+                          const Icon(
+                            Icons.group_outlined,
+                            color: AppColors.textSecondaryDark,
+                            size: 15,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
                         Expanded(
                           child: Text(
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
+                              color: AppColors.textSecondaryDark,
                               fontSize: 14,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
                             ),
                           ),
                         ),
-                        if (unread > 0)
-                          Container(
-                            margin: const EdgeInsets.only(left: 8),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '$unread',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
+                        if (unread > 0) ...[
+                          const SizedBox(width: 8),
+                          _CountBadge(value: unread),
+                        ],
                       ],
                     ),
                   ],
@@ -435,6 +631,156 @@ class _ConversationTile extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyConversationState extends StatelessWidget {
+  final VoidCallback onNewChat;
+
+  const _EmptyConversationState({required this.onNewChat});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const EmptyState(
+            icon: Icons.forum_outlined,
+            title: 'Aucune discussion',
+            subtitle: 'Démarre une conversation avec un contact.',
+          ),
+          const SizedBox(height: 18),
+          ElevatedButton.icon(
+            onPressed: onNewChat,
+            icon: const Icon(Icons.edit_square),
+            label: const Text('Démarrer une discussion'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(28),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomNavigation extends StatelessWidget {
+  final int selectedIndex;
+  final VoidCallback onProfile;
+  final VoidCallback onNearby;
+  final VoidCallback onHome;
+  final VoidCallback onSettings;
+
+  const _BottomNavigation({
+    required this.selectedIndex,
+    required this.onProfile,
+    required this.onNearby,
+    required this.onHome,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _BottomItem(Icons.people_alt_outlined, 'Contacts', onProfile),
+      _BottomItem(Icons.call_outlined, 'Proximité', onNearby),
+      _BottomItem(Icons.forum_rounded, 'Échanges', onHome),
+      _BottomItem(Icons.settings_outlined, 'Réglages', onSettings),
+    ];
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+        decoration: BoxDecoration(
+          color: const Color(0xE62A2A2A),
+          borderRadius: BorderRadius.circular(34),
+          border: Border.all(color: Colors.white.withOpacity(0.14)),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black45,
+              blurRadius: 18,
+              offset: Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            for (var i = 0; i < items.length; i++)
+              Expanded(
+                child: _BottomNavigationItem(
+                  item: items[i],
+                  selected: selectedIndex == i,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomItem {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BottomItem(this.icon, this.label, this.onTap);
+}
+
+class _BottomNavigationItem extends StatelessWidget {
+  final _BottomItem item;
+  final bool selected;
+
+  const _BottomNavigationItem({required this.item, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: item.onTap,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white.withOpacity(0.10) : Colors.transparent,
+          borderRadius: BorderRadius.circular(27),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              item.icon,
+              size: 24,
+              color: selected
+                  ? AppColors.primary
+                  : AppColors.textPrimaryDark,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected
+                    ? AppColors.primary
+                    : AppColors.textPrimaryDark,
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
