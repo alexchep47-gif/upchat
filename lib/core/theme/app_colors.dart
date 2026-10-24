@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-/// Palette UpChat — style Telegram moderne (vert WhatsApp + glass)
+/// Palette UpChat — style moderne avec accents colorés
 class AppColors {
   static const Color primary = Color(0xFF2AABEE); // bleu Telegram accent
   static const Color primaryDark = Color(0xFF229ED9);
-  static const Color accent = Color(0xFF25D366); // vert WhatsApp conserve pour actions
+  static const Color accent = Color(0xFF25D366); // vert de validation
   static const Color teal = Color(0xFF128C7E);
 
   // Bulles

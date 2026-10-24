@@ -55,30 +55,20 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     return Scaffold(
       body: CustomScrollView(
         slivers: [
-          // AppBar type WhatsApp : titre + actions essentielles
           SliverAppBar(
             floating: true,
             pinned: true,
             title: const Text('UpChat'),
             actions: [
-              // Bouton principal visible : nouvelle discussion
               IconButton(
                 icon: const Icon(Icons.chat_rounded),
                 tooltip: 'Nouvelle discussion',
-                onPressed: _openNewChat,
-              ),
-              IconButton(
-                icon: const Icon(Icons.search_rounded),
-                tooltip: 'Rechercher',
                 onPressed: _openNewChat,
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
                   switch (value) {
-                    case 'phone':
-                      _openNewChat();
-                      break;
                     case 'group':
                       Navigator.pushNamed(context, AppRouter.createGroup);
                       break;
@@ -94,15 +84,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                   }
                 },
                 itemBuilder: (_) => [
-                  const PopupMenuItem(
-                    value: 'phone',
-                    child: ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(Icons.person_add_alt_1),
-                      title: Text('Nouvelle discussion'),
-                      subtitle: Text('Par numéro de téléphone'),
-                    ),
-                  ),
                   const PopupMenuItem(
                     value: 'group',
                     child: Text('Nouveau groupe'),
@@ -135,14 +116,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             ],
           ),
 
-          // Barre de statut
           SliiverStatusBar(
             connectivity: connectivity,
             nearby: nearby,
             isDark: isDark,
           ),
 
-          // Bannière web : invite à discuter par numéro
           if (kIsWeb)
             SliverToBoxAdapter(
               child: Padding(
@@ -166,7 +145,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Discute par numéro (comme WhatsApp)',
+                                  'Discute par numéro',
                                   style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     color: isDark
@@ -214,7 +193,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         ],
       ),
 
-      // FAB principal type WhatsApp : nouvelle discussion
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -351,7 +329,7 @@ class SliiverEmpty extends StatelessWidget {
               icon: Icons.chat_bubble_outline_rounded,
               title: 'Aucune discussion 💬',
               subtitle:
-                  'Comme sur WhatsApp : lance une discussion\nen saisissant un numéro de téléphone.',
+                  'Saisis un numéro pour lancer une conversation.',
             ),
             const SizedBox(height: 8),
             if (missingPhone)

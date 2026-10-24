@@ -1,7 +1,7 @@
 /// Types de messages supportés
 enum MessageType { text, image, video, audio, file, system }
 
-/// Statut d'un message (style WhatsApp)
+/// Statut d'un message
 enum MessageStatus { sending, sent, delivered, read, failed }
 
 /// Modèle d'un message

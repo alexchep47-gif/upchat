@@ -10,7 +10,7 @@ class AppConstants {
   static const String authorCredit =
       'Créé par NEMMEGNE CHEPING ALEXANDRE MERVIN\nNationalité : Camerounaise';
 
-  // Couleurs WhatsApp-like
+  // Couleurs de base
   static const int primaryGreen = 0xFF128C7E;
   static const int accentGreen = 0xFF25D366;
   static const int lightGreen = 0xFFDCF8C6;

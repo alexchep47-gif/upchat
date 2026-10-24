@@ -12,7 +12,7 @@ import '../../providers/chat_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/profile_provider.dart';
 
-/// Nouvelle discussion par numéro — flux type WhatsApp.
+/// Nouvelle discussion par numéro — flux de contact rapide
 ///
 /// 1. Saisie du numéro
 /// 2. Lookup serveur si possible
@@ -77,7 +77,7 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
     if (profile.phoneNumber == null || profile.phoneNumber!.isEmpty) {
       setState(() {
         _error =
-            'Enregistre d’abord ton numéro dans Profil (comme sur WhatsApp).';
+            'Enregistre d’abord ton numéro dans Profil.';
       });
       return;
     }
@@ -175,7 +175,7 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
                       ),
                       Text(
                         kIsWeb
-                            ? 'Sur le web, UpChat fonctionne comme WhatsApp : le numéro identifie le contact.'
+                            ? 'Sur le web, UpChat fonctionne par numéro de téléphone pour identifier le contact.'
                             : 'Mode internet : trouve un contact à distance par son numéro.',
                         style: TextStyle(
                             color: Colors.grey.shade600, fontSize: 13),

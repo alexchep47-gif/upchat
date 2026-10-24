@@ -9,7 +9,7 @@ import '../../data/models/story_model.dart';
 import '../../data/services/storage_service.dart';
 import '../../providers/stories_provider.dart';
 
-/// Visualisation des stories avec barre de progression style WhatsApp
+/// Visualisation des stories avec barre de progression
 class StoryViewerScreen extends StatefulWidget {
   final String userId;
   final int initialIndex;
@@ -130,75 +130,3 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       fontSize: 28,
                       fontWeight: FontWeight.w500,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-
-            // Barres de progression
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
-                child: Column(
-                  children: [
-                    Row(
-                      children: List.generate(_stories.length, (i) {
-                        return Expanded(
-                          child: Container(
-                            height: 3,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white24,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: i < _currentIndex
-                                  ? 1
-                                  : i == _currentIndex
-                                      ? _progress
-                                      : 0,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: AppColors.primary,
-                          child: Text(
-                            story.userName.isNotEmpty ? story.userName[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontSize: 14),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          story.userName,
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: Colors.white),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

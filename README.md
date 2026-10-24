@@ -2,7 +2,7 @@
 
 **Messagerie P2P 100 % offline** — Bluetooth + WiFi Direct (Nearby Connections)
 
-Style WhatsApp, fonctionne sans aucune connexion internet (portée radio locale).
+Style moderne, fonctionne sans aucune connexion internet (portée radio locale).
 
 ## Créé par
 
@@ -27,7 +27,7 @@ Nationalité : **Camerounaise**
 - **Portée** : quelques dizaines de mètres (Bluetooth / WiFi Direct).  
   Une portée de centaines de km est **impossible** sans internet ou réseau cellulaire.
 - **Android uniquement** pour le vrai P2P offline (Nearby Connections = Google Play Services).
-- **Android ↔ iPhone** et **iPhone ↔ iPhone** offline type WhatsApp ne sont pas supportés par les APIs natives de façon interopérable. Un mode internet serait nécessaire pour le cross-plateforme.
+- **Android ↔ iPhone** et **iPhone ↔ iPhone** offline ne sont pas supportés par les APIs natives de façon interopérable. Un mode internet serait nécessaire pour le cross-plateforme.
 
 ## Compilation
 
