@@ -97,6 +97,7 @@ jobs:
             echo "GH_PAT absent — skip deploy Vercel"
             exit 0
           fi
+          BUILD_ID="${{ github.sha }}"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           rm -rf /tmp/upchat-web
@@ -104,10 +105,12 @@ jobs:
           rm -rf /tmp/upchat-web/app
           mkdir -p /tmp/upchat-web/app
           cp -a build/web/. /tmp/upchat-web/app/
-          echo "${{ github.sha }}" > /tmp/upchat-web/app/.last_build_id
-          echo "${{ github.sha }}" > /tmp/upchat-web/.upchat-source-sha
+          echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
+          echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
+          echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
+          echo "$BUILD_ID" > /tmp/upchat-web/.upchat-source-sha
           date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/upchat-web/app/.deployed_at
-          cat > /tmp/upchat-web/vercel.json << 'EOF'
+          cat > /tmp/upchat-web/vercel.json << EOF
           {
             "cleanUrls": false,
             "trailingSlash": true,
@@ -127,17 +130,17 @@ jobs:
           }
           EOF
           if [ ! -f /tmp/upchat-web/index.html ] || ! grep -q "upchat\|UpChat" /tmp/upchat-web/index.html 2>/dev/null; then
-            cat > /tmp/upchat-web/index.html << 'EOF'
+            cat > /tmp/upchat-web/index.html << EOF
           <!DOCTYPE html><html><head>
-          <meta http-equiv="refresh" content="0; url=/app/" />
-          <script>location.replace('/app/');</script>
-          </head><body><a href="/app/">UpChat</a></body></html>
+          <meta http-equiv="refresh" content="0; url=/app/?v=${BUILD_ID}" />
+          <script>location.replace('/app/?v=${BUILD_ID}');</script>
+          </head><body><a href="/app/?v=${BUILD_ID}">UpChat</a></body></html>
           EOF
           fi
           cd /tmp/upchat-web
           git add -A
           VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}')
-          git commit -m "Deploy UpChat ${VER} ${{ github.sha }}" || echo "Nothing to commit"
+          git commit -m "Deploy UpChat ${VER} ${BUILD_ID}" || echo "Nothing to commit"
           git push origin main
 
       - name: Build Flutter Web for GitHub Pages (/upchat/)
@@ -149,25 +152,33 @@ jobs:
           if [ -f build/web-pages/index.html ]; then
             sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
             sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
-            # No-cache meta to avoid stale SW/cache
             sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n</head>|' build/web-pages/index.html || true
           fi
+          echo "$BUILD_ID" > build/web-pages/.last_build_id
 
       - name: Deploy to GitHub Pages (branche gh-pages)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          BUILD_ID="${{ github.sha }}"
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           rm -rf /tmp/upchat-pages
           mkdir -p /tmp/upchat-pages
           cp -a build/web-pages/. /tmp/upchat-pages/
+          echo "$BUILD_ID" > /tmp/upchat-pages/.last_build_id
           cd /tmp/upchat-pages
           git init
           git checkout -b gh-pages
+          cat > index.html << EOF
+          <!DOCTYPE html><html><head>
+          <meta http-equiv="refresh" content="0; url=/upchat/?v=${BUILD_ID}" />
+          <script>location.replace('/upchat/?v=${BUILD_ID}');</script>
+          </head><body><a href="/upchat/?v=${BUILD_ID}">UpChat</a></body></html>
+          EOF
           git add -A
           git commit -m "GitHub Pages UpChat ${{ github.sha }}"
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
           git push -f origin gh-pages
-          echo "Publié sur https://alexchep47-gif.github.io/upchat/"
+          echo "Publié sur https://alexchep47-gif.github.io/upchat/?v=${BUILD_ID}"
