@@ -89,43 +89,47 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
     });
 
     try {
-      UserModel? user = await _internet.lookupByPhone(normalized);
-      user ??= _directory.findLocal(normalized);
+      final user = await _internet.lookupByPhone(
+        normalized,
+        requireRegisteredAccount: true,
+      );
 
       if (user == null) {
-        final displayName = _nameController.text.trim().isNotEmpty
-            ? _nameController.text.trim()
-            : normalized;
-        user = UserModel(
-          id: 'phone_${normalized.replaceAll('+', 'p')}',
-          name: displayName,
-          phoneNumber: normalized,
-        );
-        await _directory.upsert(user);
-        _info =
-            'Contact pas encore sur UpChat — discussion créée. Les messages seront livrés quand il s’inscrira.';
-      } else if (_nameController.text.trim().isNotEmpty &&
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _error =
+                'Aucun compte UpChat actif n’est associé à ce numéro.';
+            _info =
+                'Vérifie le numéro avec son indicatif pays ou demande à ton contact de créer un compte UpChat.';
+          });
+        }
+        return;
+      }
+
+      UserModel resolvedUser = user;
+      if (_nameController.text.trim().isNotEmpty &&
           (user.name == user.phoneNumber || user.name == normalized)) {
-        user = user.copyWith(name: _nameController.text.trim());
-        await _directory.upsert(user);
+        resolvedUser = user.copyWith(name: _nameController.text.trim());
+        await _directory.upsert(resolvedUser);
       }
 
       if (!mounted) return;
 
       final conv = context.read<ChatProvider>().getOrCreateConversation(
-            peerId: user.id,
-            peerName: user.name,
+            peerId: resolvedUser.id,
+            peerName: resolvedUser.name,
           );
 
       if (!mounted) return;
       Navigator.pushReplacementNamed(
         context,
         AppRouter.chat,
-        arguments: {
-          'conversationId': conv.id,
-          'peerName': user.name,
-          'peerId': user.id,
-        },
+            arguments: {
+              'conversationId': conv.id,
+              'peerName': resolvedUser.name,
+              'peerId': resolvedUser.id,
+            },
       );
     } catch (e) {
       if (mounted) {

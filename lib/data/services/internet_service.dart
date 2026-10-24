@@ -148,13 +148,16 @@ class InternetService {
   }
 
   /// Recherche un utilisateur par numéro de téléphone (réseau + cache local)
-  Future<UserModel?> lookupByPhone(String rawPhone) async {
+  Future<UserModel?> lookupByPhone(
+    String rawPhone, {
+    bool requireRegisteredAccount = false,
+  }) async {
     final phone = StorageService.normalizePhone(rawPhone);
     if (phone.isEmpty) return null;
 
     // Cache local d'abord
     final local = _directory.findLocal(phone);
-    if (local != null) return local;
+    if (!requireRegisteredAccount && local != null) return local;
 
     if (!_isOnline) return null;
 

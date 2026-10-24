@@ -83,6 +83,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 alignment: Alignment.topCenter,
                 child: SizedBox(
                   width: contentWidth,
+                  height: constraints.maxHeight,
                   child: CustomScrollView(
                     slivers: [
                       SliverToBoxAdapter(
