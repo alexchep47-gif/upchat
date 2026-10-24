@@ -19,6 +19,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _bioController;
+  late TextEditingController _phoneController;
   bool _pickingPhoto = false;
 
   @override
@@ -27,12 +28,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final profile = context.read<ProfileProvider>();
     _nameController = TextEditingController(text: profile.name);
     _bioController = TextEditingController(text: profile.bio ?? '');
+    _phoneController =
+        TextEditingController(text: profile.phoneNumber ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
@@ -60,7 +64,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             if (context.read<ProfileProvider>().photoPath != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Supprimer la photo', style: TextStyle(color: Colors.red)),
+                title: const Text('Supprimer la photo',
+                    style: TextStyle(color: Colors.red)),
                 onTap: () => Navigator.pop(ctx, 'remove'),
               ),
             ListTile(
@@ -92,13 +97,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final media = MediaService();
       final file = await media.pickImage(fromCamera: source == 'camera');
       if (file != null && mounted) {
-        // Vérifie que le fichier existe bien
         final exists = await file.exists();
-        if (!exists) {
-          throw Exception('Fichier introuvable');
-        }
+        if (!exists) throw Exception('Fichier introuvable');
         await context.read<ProfileProvider>().updatePhoto(file.path);
-        setState(() {}); // Force le rebuild de l'avatar
+        setState(() {});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Photo de profil mise à jour')),
@@ -129,9 +131,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onPressed: () async {
               await profile.updateName(_nameController.text);
               await profile.updateBio(_bioController.text);
+              await profile.updatePhone(_phoneController.text);
               if (mounted) Navigator.pop(context);
             },
-            child: const Text('Enregistrer', style: TextStyle(color: Colors.white)),
+            child: const Text('Enregistrer',
+                style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -167,7 +171,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   color: Colors.white,
                                 ),
                               )
-                            : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                            : const Icon(Icons.camera_alt,
+                                color: Colors.white, size: 20),
                       ),
                     ),
                   ),
@@ -204,6 +209,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 16),
           TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Numéro de téléphone',
+              hintText: '+237 6XX XXX XXX',
+              prefixIcon: Icon(Icons.phone),
+              helperText:
+                  'Utilisé uniquement en mode internet pour te retrouver à distance',
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
             controller: _bioController,
             maxLines: 3,
             decoration: const InputDecoration(
@@ -215,7 +232,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ListTile(
             leading: const Icon(Icons.fingerprint),
             title: const Text('Identifiant local'),
-            subtitle: Text(profile.userId, style: const TextStyle(fontSize: 12)),
+            subtitle:
+                Text(profile.userId, style: const TextStyle(fontSize: 12)),
           ),
         ],
       ),

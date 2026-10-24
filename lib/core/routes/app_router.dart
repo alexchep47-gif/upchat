@@ -7,6 +7,7 @@ import '../../features/stories/create_story_screen.dart';
 import '../../features/stories/story_viewer_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/settings/settings_screen.dart';
+import '../../features/contacts/add_contact_by_phone_screen.dart';
 
 /// Gestion centralisée des routes de l'application
 class AppRouter {
@@ -19,6 +20,7 @@ class AppRouter {
   static const String storyViewer = '/story-viewer';
   static const String profile = '/profile';
   static const String settings = '/settings';
+  static const String addContactByPhone = '/add-contact-phone';
 
   static Route<dynamic> onGenerateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -60,6 +62,10 @@ class AppRouter {
 
       case settings:
         return MaterialPageRoute(builder: (_) => const SettingsScreen());
+
+      case addContactByPhone:
+        return MaterialPageRoute(
+            builder: (_) => const AddContactByPhoneScreen());
 
       default:
         return MaterialPageRoute(

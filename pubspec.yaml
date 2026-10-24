@@ -1,7 +1,7 @@
 name: upchat
 description: UpChat — Messagerie P2P 100% offline (Bluetooth + WiFi Direct) style WhatsApp.
 publish_to: 'none'
-version: 1.1.0+3
+version: 1.3.0+4
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -22,6 +22,9 @@ dependencies:
 
   # P2P Nearby Connections (Bluetooth + WiFi Direct)
   nearby_connections: ^4.1.1
+
+  # Réseau (mode internet / signalisation)
+  http: ^1.2.2
 
   # Médias
   image_picker: ^1.1.2
