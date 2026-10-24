@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -18,7 +17,6 @@ import '../../providers/profile_provider.dart';
 /// 1. Saisie du numéro
 /// 2. Lookup serveur si possible
 /// 3. Sinon création d’une conversation locale liée au numéro
-///    (le message partira dès que le contact s’inscrit / se connecte)
 class AddContactByPhoneScreen extends StatefulWidget {
   const AddContactByPhoneScreen({super.key});
 
@@ -32,7 +30,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
   final _nameController = TextEditingController();
   final _internet = InternetService();
   final _directory = PhoneDirectoryService();
-  final _uuid = const Uuid();
   bool _loading = false;
   String? _error;
   String? _info;
@@ -42,7 +39,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final connectivity = context.read<ConnectivityProvider>();
-      // Web / mode WhatsApp : internet toujours on pour ce flux
       if (!connectivity.internetModeEnabled) {
         await connectivity.setInternetMode(true);
         if (mounted) setState(() {});
@@ -77,7 +73,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
       return;
     }
 
-    // Comme WhatsApp : ton propre numéro doit être renseigné
     final profile = context.read<ProfileProvider>();
     if (profile.phoneNumber == null || profile.phoneNumber!.isEmpty) {
       setState(() {
@@ -94,13 +89,9 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
     });
 
     try {
-      // 1) Lookup réseau
       UserModel? user = await _internet.lookupByPhone(normalized);
-
-      // 2) Cache local
       user ??= _directory.findLocal(normalized);
 
-      // 3) Style WhatsApp : on crée quand même la discussion
       if (user == null) {
         final displayName = _nameController.text.trim().isNotEmpty
             ? _nameController.text.trim()
@@ -113,13 +104,10 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
         await _directory.upsert(user);
         _info =
             'Contact pas encore sur UpChat — discussion créée. Les messages seront livrés quand il s’inscrira.';
-      } else {
-        // Enrichit le nom si fourni
-        if (_nameController.text.trim().isNotEmpty &&
-            (user.name == user.phoneNumber || user.name == normalized)) {
-          user = user.copyWith(name: _nameController.text.trim());
-          await _directory.upsert(user);
-        }
+      } else if (_nameController.text.trim().isNotEmpty &&
+          (user.name == user.phoneNumber || user.name == normalized)) {
+        user = user.copyWith(name: _nameController.text.trim());
+        await _directory.upsert(user);
       }
 
       if (!mounted) return;
@@ -163,7 +151,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          // En-tête type WhatsApp
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -172,9 +159,9 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
             ),
             child: Row(
               children: [
-                CircleAvatar(
+                const CircleAvatar(
                   backgroundColor: AppColors.accent,
-                  child: const Icon(Icons.person_add_alt_1, color: Colors.white),
+                  child: Icon(Icons.person_add_alt_1, color: Colors.white),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -330,9 +317,6 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
               );
             }),
           ],
-
-          // ignore unused uuid warning path — reserved for future server-assigned ids
-          if (false) Text(_uuid.v4()),
         ],
       ),
     );
