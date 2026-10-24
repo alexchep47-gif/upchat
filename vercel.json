@@ -1,5 +1,5 @@
 {
-  "buildCommand": "flutter create . --platforms web --project-name upchat && flutter pub get && flutter build web --release --base-href /",
+  "buildCommand": "export PATH=\"/tmp/flutter/bin:$PATH\" && flutter create . --platforms web --project-name upchat && flutter pub get && flutter build web --release --base-href /",
   "outputDirectory": "build/web",
   "framework": null,
   "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version && flutter precache --web",
