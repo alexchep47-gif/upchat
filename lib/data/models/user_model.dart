@@ -41,7 +41,9 @@ class UserModel {
     return UserModel(
       id: map['id'] as String,
       name: map['name'] as String? ?? 'Inconnu',
-      phoneNumber: map['phoneNumber'] as String?,
+      phoneNumber: map['phoneNumber'] is String
+          ? normalizePhone(map['phoneNumber'] as String)
+          : null,
       bio: map['bio'] as String?,
       photoPath: map['photoPath'] as String?,
       endpointId: map['endpointId'] as String?,

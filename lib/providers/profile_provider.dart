@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../data/services/storage_service.dart';
+import '../data/services/contact_directory_service.dart';
 import '../data/models/user_model.dart';
 
 /// Gère le profil de l'utilisateur local
@@ -44,6 +45,7 @@ class ProfileProvider extends ChangeNotifier {
   Future<void> updateName(String newName) async {
     _name = newName.trim().isEmpty ? 'Utilisateur' : newName.trim();
     await StorageService.setUserName(_name);
+    await _syncDirectoryRecord();
     notifyListeners();
   }
 
@@ -55,8 +57,7 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _syncDirectoryRecord() {
-    if (_phoneNumber == null) return;
+  Future<void> _syncDirectoryRecord() async {
     final user = UserModel(
       id: userId,
       name: _name,
@@ -64,12 +65,13 @@ class ProfileProvider extends ChangeNotifier {
       bio: _bio,
       photoPath: _photoPath,
     );
-    StorageService.users.put(user.id, user.toMap());
+    await ContactDirectoryService().upsert(user);
   }
 
   Future<void> updateBio(String? newBio) async {
     _bio = newBio?.trim();
     await StorageService.setUserBio(_bio);
+    await _syncDirectoryRecord();
     notifyListeners();
   }
 
@@ -83,6 +85,7 @@ class ProfileProvider extends ChangeNotifier {
     }
     _photoPath = path;
     await StorageService.setUserPhotoPath(path);
+    await _syncDirectoryRecord();
     notifyListeners();
   }
 }
