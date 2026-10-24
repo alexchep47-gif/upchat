@@ -22,6 +22,7 @@ dependencies:
 
   # P2P Nearby Connections (Bluetooth + WiFi Direct)
   nearby_connections: ^4.1.1
+  flutter_nearby_connections_plus: ^1.2.2
 
   # Médias
   image_picker: ^1.1.2
