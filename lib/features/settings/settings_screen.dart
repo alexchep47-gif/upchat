@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/storage_service.dart';
 import '../../data/services/cleanup_service.dart';
@@ -16,11 +17,22 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _cleaning = false;
+  late bool _autoCleanup;
+  late bool _autoPlayStories;
+  late int _storyDuration;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoCleanup = StorageService.autoCleanup;
+    _autoPlayStories = StorageService.autoPlayStories;
+    _storyDuration = StorageService.storyViewDuration;
+  }
 
   Future<void> _runCleanup() async {
     setState(() => _cleaning = true);
     final report = await CleanupService().run();
-    setState(() => _cleaning = false);
+    if (mounted) setState(() => _cleaning = false);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -154,6 +166,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const Divider(),
 
+          const ListTile(
+            title: Text('Stories', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.play_circle_outline_rounded),
+            title: const Text('Lecture automatique'),
+            subtitle: Text(
+              _autoPlayStories
+                  ? 'Les stories avancent automatiquement'
+                  : 'Passe à la story suivante manuellement',
+            ),
+            value: _autoPlayStories,
+            activeColor: AppColors.accent,
+            onChanged: (value) async {
+              await StorageService.setAutoPlayStories(value);
+              if (mounted) setState(() => _autoPlayStories = value);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.timer_outlined),
+            title: const Text('Durée par story'),
+            subtitle: const Text('Temps d’affichage avant le passage suivant'),
+            trailing: DropdownButton<int>(
+              value: _storyDuration,
+              items: const [3, 5, 8, 10, 15]
+                  .map(
+                    (seconds) => DropdownMenuItem<int>(
+                      value: seconds,
+                      child: Text('${seconds}s'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) async {
+                if (value == null) return;
+                await StorageService.setStoryViewDuration(value);
+                if (mounted) setState(() => _storyDuration = value);
+              },
+            ),
+          ),
+
+          const Divider(),
+
           ListTile(
             leading: const Icon(Icons.cleaning_services_outlined),
             title: const Text('Nettoyer le stockage'),
@@ -166,6 +220,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   )
                 : null,
             onTap: _cleaning ? null : _runCleanup,
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.auto_delete_outlined),
+            title: const Text('Nettoyage automatique'),
+            subtitle: const Text('Nettoyer les stories expirées au démarrage'),
+            value: _autoCleanup,
+            activeColor: AppColors.accent,
+            onChanged: (value) async {
+              await StorageService.setAutoCleanup(value);
+              if (mounted) setState(() => _autoCleanup = value);
+            },
           ),
           ListTile(
             leading: const Icon(Icons.delete_outline, color: AppColors.error),
@@ -202,6 +267,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.person_outline_rounded),
+            title: const Text('Mon profil'),
+            subtitle: const Text('Nom, photo et numéro de téléphone'),
+            onTap: () => Navigator.pushNamed(context, AppRouter.profile),
+          ),
 
           ListTile(
             leading: const Icon(Icons.info_outline),

@@ -47,4 +47,7 @@ class AppConstants {
   static const String keyOnboardingDone = 'onboarding_done';
   static const String keyEncryptionKey = 'encryption_key';
   static const String keyInternetMode = 'internet_mode';
+  static const String keyAutoCleanup = 'auto_cleanup';
+  static const String keyAutoPlayStories = 'auto_play_stories';
+  static const String keyStoryViewDuration = 'story_view_duration';
 }

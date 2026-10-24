@@ -93,10 +93,52 @@ class StoriesProvider extends ChangeNotifier {
       createdAt: story.createdAt,
       expiresAt: story.expiresAt,
       viewedBy: [...story.viewedBy, viewerId],
+      comments: story.comments,
     );
 
     _stories[index] = updated;
     StorageService.stories.put(storyId, updated.toMap());
     notifyListeners();
+  }
+
+  Future<bool> addComment({
+    required String storyId,
+    required String text,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return false;
+
+    final index = _stories.indexWhere((story) => story.id == storyId);
+    if (index == -1 || _stories[index].isExpired) return false;
+
+    final story = _stories[index];
+    final comment = StoryComment(
+      id: _uuid.v4(),
+      userId: StorageService.userId,
+      userName: StorageService.userName,
+      text: trimmed,
+    );
+    final updated = StoryModel(
+      id: story.id,
+      userId: story.userId,
+      userName: story.userName,
+      type: story.type,
+      content: story.content,
+      mediaPath: story.mediaPath,
+      createdAt: story.createdAt,
+      expiresAt: story.expiresAt,
+      viewedBy: story.viewedBy,
+      comments: [...story.comments, comment],
+    );
+
+    _stories[index] = updated;
+    await StorageService.stories.put(story.id, updated.toMap());
+    notifyListeners();
+
+    await _nearby.broadcastText(
+      conversationId: 'story_${story.id}',
+      text: '💬 ${StorageService.userName}: $trimmed',
+    );
+    return true;
   }
 }

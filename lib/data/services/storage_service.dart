@@ -120,6 +120,27 @@ class StorageService {
     await _settingsBox.put(AppConstants.keyOnboardingDone, true);
   }
 
+  static bool get autoCleanup =>
+      _settingsBox.get(AppConstants.keyAutoCleanup, defaultValue: true) as bool;
+
+  static Future<void> setAutoCleanup(bool value) async {
+    await _settingsBox.put(AppConstants.keyAutoCleanup, value);
+  }
+
+  static bool get autoPlayStories => _settingsBox
+      .get(AppConstants.keyAutoPlayStories, defaultValue: true) as bool;
+
+  static Future<void> setAutoPlayStories(bool value) async {
+    await _settingsBox.put(AppConstants.keyAutoPlayStories, value);
+  }
+
+  static int get storyViewDuration => _settingsBox
+      .get(AppConstants.keyStoryViewDuration, defaultValue: 5) as int;
+
+  static Future<void> setStoryViewDuration(int seconds) async {
+    await _settingsBox.put(AppConstants.keyStoryViewDuration, seconds);
+  }
+
   /// Efface toutes les discussions (messages + conversations)
   static Future<void> clearChats() async {
     await _messagesBox.clear();
