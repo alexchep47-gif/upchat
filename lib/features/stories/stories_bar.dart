@@ -6,7 +6,6 @@ import '../../core/theme/app_colors.dart';
 import '../../data/services/storage_service.dart';
 import '../../providers/stories_provider.dart';
 
-/// Barre horizontale des stories (style WhatsApp)
 class StoriesBar extends StatelessWidget {
   const StoriesBar({super.key});
 
@@ -18,12 +17,11 @@ class StoriesBar extends StatelessWidget {
     final hasMyStory = byUser.containsKey(myId);
 
     return SizedBox(
-      height: 100,
+      height: 108,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         children: [
-          // Ma story
           _StoryCircle(
             name: 'Ma story',
             hasStory: hasMyStory,
@@ -41,21 +39,17 @@ class StoriesBar extends StatelessWidget {
             },
             onLongPress: () => Navigator.pushNamed(context, AppRouter.createStory),
           ),
-
-          // Stories des autres
           ...byUser.entries.where((e) => e.key != myId).map((entry) {
-            final userId = entry.key;
             final stories = entry.value;
-            final name = stories.first.userName;
             return _StoryCircle(
-              name: name,
+              name: stories.first.userName,
               hasStory: true,
               isMe: false,
               onTap: () {
                 Navigator.pushNamed(
                   context,
                   AppRouter.storyViewer,
-                  arguments: {'userId': userId, 'initialIndex': 0},
+                  arguments: {'userId': entry.key, 'initialIndex': 0},
                 );
               },
             );
@@ -87,50 +81,59 @@ class _StoryCircle extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       child: Padding(
-        padding: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.only(right: 14),
         child: Column(
           children: [
             Container(
-              width: 62,
-              height: 62,
+              width: 66,
+              height: 66,
+              padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: hasStory
                     ? const LinearGradient(
-                        colors: [Color(0xFF25D366), Color(0xFF128C7E)],
+                        colors: [
+                          Color(0xFF2AABEE),
+                          Color(0xFF25D366),
+                          Color(0xFFFFB800),
+                        ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       )
                     : null,
-                border: hasStory ? null : Border.all(color: Colors.grey.shade400, width: 1.5),
+                border: hasStory
+                    ? null
+                    : Border.all(color: Colors.grey.shade400, width: 1.5),
               ),
-              padding: const EdgeInsets.all(2.5),
               child: Container(
+                padding: const EdgeInsets.all(2.5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Theme.of(context).scaffoldBackgroundColor,
                 ),
-                padding: const EdgeInsets.all(2),
                 child: CircleAvatar(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primary.withOpacity(0.15),
                   child: isMe && !hasStory
-                      ? const Icon(Icons.add, color: Colors.white)
+                      ? const Icon(Icons.add_rounded, color: AppColors.primary)
                       : Text(
                           name.isNotEmpty ? name[0].toUpperCase() : '?',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                 ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             SizedBox(
-              width: 64,
+              width: 68,
               child: Text(
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 11),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
               ),
             ),
           ],
