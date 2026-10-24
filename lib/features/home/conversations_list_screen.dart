@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -26,8 +27,19 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<NearbyProvider>().start();
+      // Sur web : mode internet prioritaire (pas de Bluetooth)
+      final connectivity = context.read<ConnectivityProvider>();
+      if (kIsWeb && !connectivity.internetModeEnabled) {
+        connectivity.setInternetMode(true);
+      }
+      if (!kIsWeb) {
+        context.read<NearbyProvider>().start();
+      }
     });
+  }
+
+  void _openNewChat() {
+    Navigator.pushNamed(context, AppRouter.addContactByPhone);
   }
 
   @override
@@ -37,50 +49,44 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     final connectivity = context.watch<ConnectivityProvider>();
     final profile = context.watch<ProfileProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasContent =
+        chat.conversations.isNotEmpty || nearby.nearbyDevices.isNotEmpty;
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
+          // AppBar type WhatsApp : titre + actions essentielles
           SliverAppBar(
             floating: true,
             pinned: true,
-            expandedHeight: 0,
             title: const Text('UpChat'),
             actions: [
+              // Bouton principal visible : nouvelle discussion
               IconButton(
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-                tooltip: 'Contact par numéro',
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRouter.addContactByPhone),
+                icon: const Icon(Icons.chat_rounded),
+                tooltip: 'Nouvelle discussion',
+                onPressed: _openNewChat,
               ),
               IconButton(
                 icon: const Icon(Icons.search_rounded),
-                onPressed: () {},
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: GestureDetector(
-                  onTap: () => Navigator.pushNamed(context, AppRouter.profile),
-                  child: ProfileAvatar(
-                    name: profile.name,
-                    photoPath: profile.photoPath,
-                    radius: 16,
-                  ),
-                ),
+                tooltip: 'Rechercher',
+                onPressed: _openNewChat,
               ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
                   switch (value) {
                     case 'phone':
-                      Navigator.pushNamed(
-                          context, AppRouter.addContactByPhone);
+                      _openNewChat();
                       break;
                     case 'group':
                       Navigator.pushNamed(context, AppRouter.createGroup);
                       break;
                     case 'story':
                       Navigator.pushNamed(context, AppRouter.createStory);
+                      break;
+                    case 'profile':
+                      Navigator.pushNamed(context, AppRouter.profile);
                       break;
                     case 'settings':
                       Navigator.pushNamed(context, AppRouter.settings);
@@ -89,164 +95,374 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 },
                 itemBuilder: (_) => [
                   const PopupMenuItem(
-                      value: 'phone',
-                      child: Text('📱 Contact par numéro')),
+                    value: 'phone',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.person_add_alt_1),
+                      title: Text('Nouvelle discussion'),
+                      subtitle: Text('Par numéro de téléphone'),
+                    ),
+                  ),
                   const PopupMenuItem(
-                      value: 'story', child: Text('📖 Nouvelle story')),
+                    value: 'group',
+                    child: Text('Nouveau groupe'),
+                  ),
                   const PopupMenuItem(
-                      value: 'group', child: Text('👥 Nouveau groupe')),
+                    value: 'story',
+                    child: Text('Nouvelle story'),
+                  ),
                   const PopupMenuItem(
-                      value: 'settings', child: Text('⚙️ Réglages')),
+                    value: 'profile',
+                    child: Text('Profil'),
+                  ),
+                  const PopupMenuItem(
+                    value: 'settings',
+                    child: Text('Réglages'),
+                  ),
                 ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: 10, left: 2),
+                child: GestureDetector(
+                  onTap: () => Navigator.pushNamed(context, AppRouter.profile),
+                  child: ProfileAvatar(
+                    name: profile.name,
+                    photoPath: profile.photoPath,
+                    radius: 15,
+                  ),
+                ),
               ),
             ],
           ),
 
-          // Status glass bar
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: (connectivity.isHybridReady
-                              ? Colors.blue
-                              : nearby.isRunning
-                                  ? AppColors.accent
-                                  : Colors.grey)
-                          .withOpacity(isDark ? 0.15 : 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(isDark ? 0.06 : 0.4),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          connectivity.isHybridReady
-                              ? '🌐'
-                              : nearby.isRunning
-                                  ? '📡'
-                                  : '💤',
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            connectivity.isHybridReady
-                                ? 'Mode hybride — local + internet'
-                                : nearby.isRunning
-                                    ? 'Offline — ${nearby.nearbyDevices.length} appareil(s) proche(s)'
-                                    : connectivity.statusLabel,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
+          // Barre de statut
+          SliiverStatusBar(
+            connectivity: connectivity,
+            nearby: nearby,
+            isDark: isDark,
+          ),
+
+          // Bannière web : invite à discuter par numéro
+          if (kIsWeb)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Material(
+                  color: AppColors.accent.withOpacity(isDark ? 0.18 : 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _openNewChat,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.phone_in_talk_rounded,
+                              color: AppColors.accent),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Discute par numéro (comme WhatsApp)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                                Text(
+                                  profile.phoneNumber == null ||
+                                          profile.phoneNumber!.isEmpty
+                                      ? 'Ajoute d’abord ton numéro dans Profil'
+                                      : 'Ton numéro : ${profile.phoneNumber}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
-                      ],
+                          const Icon(Icons.chevron_right_rounded),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
 
-          const SliverToBoxAdapter(child: StoriesBar()),
+          const SliiverStories(),
 
-          if (chat.conversations.isEmpty && nearby.nearbyDevices.isEmpty)
-            const // ignore: prefer_const_constructors
-                SliverFillRemaining(
-              child: EmptyState(
-                icon: Icons.chat_bubble_outline_rounded,
-                title: 'Aucune discussion 💬',
-                subtitle:
-                    'Approche-toi d\'autres téléphones UpChat\nou ajoute un contact par numéro (mode internet).',
-              ),
+          if (!hasContent)
+            SliiverEmpty(
+              onNewChat: _openNewChat,
+              missingPhone: profile.phoneNumber == null ||
+                  profile.phoneNumber!.isEmpty,
             )
           else
-            // ignore: prefer_const_constructors
-            // ignore: prefer_const_constructors
-            SliverList(
-              delegate: SliverChildListDelegate([
-                if (nearby.nearbyDevices.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-                    child: Text(
-                      'À proximité ✨',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                        fontSize: 13,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                  ...nearby.nearbyDevices.map((device) {
-                    return _ConversationTile(
-                      title: device.name,
-                      subtitle: '🟢 En ligne · à proximité',
-                      onTap: () {
-                        final conv =
-                            context.read<ChatProvider>().getOrCreateConversation(
-                                  peerId: device.id,
-                                  peerName: device.name,
-                                  endpointId: device.endpointId,
-                                );
-                        Navigator.pushNamed(
-                          context,
-                          AppRouter.chat,
-                          arguments: {
-                            'conversationId': conv.id,
-                            'peerName': device.name,
-                            'peerId': device.id,
-                          },
-                        );
-                      },
-                    );
-                  }),
-                  const Divider(height: 24),
-                ],
-                ...chat.conversations.map((conv) {
-                  final time = conv.lastMessageAt != null
-                      ? DateFormat('HH:mm').format(conv.lastMessageAt!)
-                      : '';
-                  return _ConversationTile(
-                    title: conv.title,
-                    subtitle: conv.lastMessage ?? '',
-                    time: time,
-                    unread: conv.unreadCount,
-                    onTap: () {
-                      Navigator.pushNamed(
-                        context,
-                        AppRouter.chat,
-                        arguments: {
-                          'conversationId': conv.id,
-                          'peerName': conv.title,
-                          'peerId': conv.id,
-                        },
-                      );
-                    },
-                  );
-                }),
-                const SizedBox(height: 88),
-              ]),
+            SliiverConversations(
+              nearby: nearby,
+              chat: chat,
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.pushNamed(context, AppRouter.createStory),
-        icon: const Icon(Icons.camera_alt_rounded),
-        label: const Text('Story'),
+
+      // FAB principal type WhatsApp : nouvelle discussion
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!kIsWeb)
+            FloatingActionButton.small(
+              heroTag: 'story_fab',
+              onPressed: () =>
+                  Navigator.pushNamed(context, AppRouter.createStory),
+              backgroundColor: isDark ? Colors.grey.shade800 : Colors.white,
+              foregroundColor: AppColors.primary,
+              child: const Icon(Icons.camera_alt_rounded),
+            ),
+          if (!kIsWeb) const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'new_chat_fab',
+            onPressed: _openNewChat,
+            backgroundColor: AppColors.accent,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.chat_rounded),
+            label: const Text('Nouvelle discussion'),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// Barre de statut (extrait pour alléger le build)
+class SliiverStatusBar extends StatelessWidget {
+  final ConnectivityProvider connectivity;
+  final NearbyProvider nearby;
+  final bool isDark;
+
+  const SliiverStatusBar({
+    super.key,
+    required this.connectivity,
+    required this.nearby,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: (connectivity.isHybridReady || kIsWeb
+                        ? Colors.blue
+                        : nearby.isRunning
+                            ? AppColors.accent
+                            : Colors.grey)
+                    .withOpacity(isDark ? 0.15 : 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: Colors.white.withOpacity(isDark ? 0.06 : 0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    kIsWeb || connectivity.isHybridReady
+                        ? '🌐'
+                        : nearby.isRunning
+                            ? '📡'
+                            : '💤',
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      kIsWeb
+                          ? 'Mode internet — discussions par numéro'
+                          : connectivity.isHybridReady
+                              ? 'Mode hybride — local + internet'
+                              : nearby.isRunning
+                                  ? 'Offline — ${nearby.nearbyDevices.length} appareil(s) proche(s)'
+                                  : connectivity.statusLabel,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class SliiverStories extends StatelessWidget {
+  const SliiverStories({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const SliverToBoxAdapter(child: StoriesBar());
+  }
+}
+
+class SliiverEmpty extends StatelessWidget {
+  final VoidCallback onNewChat;
+  final bool missingPhone;
+
+  const SliiverEmpty({
+    super.key,
+    required this.onNewChat,
+    required this.missingPhone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverFillRemaining(
+      hasScrollBody: false,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const EmptyState(
+              icon: Icons.chat_bubble_outline_rounded,
+              title: 'Aucune discussion 💬',
+              subtitle:
+                  'Comme sur WhatsApp : lance une discussion\nen saisissant un numéro de téléphone.',
+            ),
+            const SizedBox(height: 8),
+            if (missingPhone)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: TextButton.icon(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRouter.profile),
+                  icon: const Icon(Icons.phone_android),
+                  label: const Text('Enregistrer mon numéro d’abord'),
+                ),
+              ),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onNewChat,
+                icon: const Icon(Icons.chat_rounded),
+                label: const Text('Nouvelle discussion'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class SliiverConversations extends StatelessWidget {
+  final NearbyProvider nearby;
+  final ChatProvider chat;
+
+  const SliiverConversations({
+    super.key,
+    required this.nearby,
+    required this.chat,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverList(
+      delegate: SliverChildListDelegate([
+        if (!kIsWeb && nearby.nearbyDevices.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: Text(
+              'À proximité ✨',
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+                fontSize: 13,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          ...nearby.nearbyDevices.map((device) {
+            return _ConversationTile(
+              title: device.name,
+              subtitle: '🟢 En ligne · à proximité',
+              onTap: () {
+                final conv =
+                    context.read<ChatProvider>().getOrCreateConversation(
+                          peerId: device.id,
+                          peerName: device.name,
+                          endpointId: device.endpointId,
+                        );
+                Navigator.pushNamed(
+                  context,
+                  AppRouter.chat,
+                  arguments: {
+                    'conversationId': conv.id,
+                    'peerName': device.name,
+                    'peerId': device.id,
+                  },
+                );
+              },
+            );
+          }),
+          const Divider(height: 24),
+        ],
+        ...chat.conversations.map((conv) {
+          final time = conv.lastMessageAt != null
+              ? DateFormat('HH:mm').format(conv.lastMessageAt!)
+              : '';
+          return _ConversationTile(
+            title: conv.title,
+            subtitle: conv.lastMessage ?? '',
+            time: time,
+            unread: conv.unreadCount,
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                AppRouter.chat,
+                arguments: {
+                  'conversationId': conv.id,
+                  'peerName': conv.title,
+                  'peerId': conv.id,
+                },
+              );
+            },
+          );
+        }),
+        const SizedBox(height: 100),
+      ]),
     );
   }
 }
@@ -320,8 +536,9 @@ class _ConversationTile extends StatelessWidget {
                                   : (isDark
                                       ? AppColors.textSecondaryDark
                                       : AppColors.textSecondaryLight),
-                              fontWeight:
-                                  unread > 0 ? FontWeight.w600 : FontWeight.w400,
+                              fontWeight: unread > 0
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
                             ),
                           ),
                       ],

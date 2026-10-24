@@ -1,15 +1,24 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/user_model.dart';
 import '../../data/services/internet_service.dart';
 import '../../data/services/phone_directory_service.dart';
 import '../../data/services/storage_service.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../providers/profile_provider.dart';
 
-/// Ajoute un contact par numéro de téléphone (mode internet).
+/// Nouvelle discussion par numéro — flux type WhatsApp.
+///
+/// 1. Saisie du numéro
+/// 2. Lookup serveur si possible
+/// 3. Sinon création d’une conversation locale liée au numéro
+///    (le message partira dès que le contact s’inscrit / se connecte)
 class AddContactByPhoneScreen extends StatefulWidget {
   const AddContactByPhoneScreen({super.key});
 
@@ -20,56 +29,100 @@ class AddContactByPhoneScreen extends StatefulWidget {
 
 class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
   final _phoneController = TextEditingController();
+  final _nameController = TextEditingController();
   final _internet = InternetService();
   final _directory = PhoneDirectoryService();
+  final _uuid = const Uuid();
   bool _loading = false;
   String? _error;
+  String? _info;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final connectivity = context.read<ConnectivityProvider>();
+      // Web / mode WhatsApp : internet toujours on pour ce flux
+      if (!connectivity.internetModeEnabled) {
+        await connectivity.setInternetMode(true);
+        if (mounted) setState(() {});
+      }
+    });
+  }
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  Future<void> _search() async {
+  Future<void> _startChat() async {
     final raw = _phoneController.text.trim();
     if (raw.isEmpty) {
       setState(() => _error = 'Saisis un numéro de téléphone');
       return;
     }
 
-    final myPhone = StorageService.userPhone;
     final normalized = StorageService.normalizePhone(raw);
-    if (myPhone != null &&
-        StorageService.normalizePhone(myPhone) == normalized) {
-      setState(() => _error = 'C\'est ton propre numéro');
+    if (normalized.isEmpty || normalized.replaceAll('+', '').length < 8) {
+      setState(() => _error = 'Numéro invalide');
       return;
     }
 
-    final connectivity = context.read<ConnectivityProvider>();
-    if (!connectivity.internetModeEnabled) {
-      setState(() => _error =
-          'Active d\'abord le mode internet dans Réglages');
+    final myPhone = StorageService.userPhone;
+    if (myPhone != null &&
+        StorageService.normalizePhone(myPhone) == normalized) {
+      setState(() => _error = 'C’est ton propre numéro');
+      return;
+    }
+
+    // Comme WhatsApp : ton propre numéro doit être renseigné
+    final profile = context.read<ProfileProvider>();
+    if (profile.phoneNumber == null || profile.phoneNumber!.isEmpty) {
+      setState(() {
+        _error =
+            'Enregistre d’abord ton numéro dans Profil (comme sur WhatsApp).';
+      });
       return;
     }
 
     setState(() {
       _loading = true;
       _error = null;
+      _info = null;
     });
 
     try {
-      final user = await _internet.lookupByPhone(raw);
-      if (!mounted) return;
+      // 1) Lookup réseau
+      UserModel? user = await _internet.lookupByPhone(normalized);
 
+      // 2) Cache local
+      user ??= _directory.findLocal(normalized);
+
+      // 3) Style WhatsApp : on crée quand même la discussion
       if (user == null) {
-        setState(() {
-          _loading = false;
-          _error =
-              'Aucun utilisateur UpChat trouvé pour ce numéro.\nIl doit avoir activé le mode internet et enregistré son numéro.';
-        });
-        return;
+        final displayName = _nameController.text.trim().isNotEmpty
+            ? _nameController.text.trim()
+            : normalized;
+        user = UserModel(
+          id: 'phone_${normalized.replaceAll('+', 'p')}',
+          name: displayName,
+          phoneNumber: normalized,
+        );
+        await _directory.upsert(user);
+        _info =
+            'Contact pas encore sur UpChat — discussion créée. Les messages seront livrés quand il s’inscrira.';
+      } else {
+        // Enrichit le nom si fourni
+        if (_nameController.text.trim().isNotEmpty &&
+            (user.name == user.phoneNumber || user.name == normalized)) {
+          user = user.copyWith(name: _nameController.text.trim());
+          await _directory.upsert(user);
+        }
       }
+
+      if (!mounted) return;
 
       final conv = context.read<ChatProvider>().getOrCreateConversation(
             peerId: user.id,
@@ -90,7 +143,7 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Erreur réseau : $e';
+          _error = 'Erreur : $e';
         });
       }
     }
@@ -99,55 +152,124 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
   @override
   Widget build(BuildContext context) {
     final known = _directory.all();
-    final connectivity = context.watch<ConnectivityProvider>();
+    final profile = context.watch<ProfileProvider>();
+    final hasMyPhone =
+        profile.phoneNumber != null && profile.phoneNumber!.isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Contact par numéro')),
+      appBar: AppBar(
+        title: const Text('Nouvelle discussion'),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Icon(Icons.phone_forwarded_rounded,
-              size: 56, color: AppColors.primary),
-          const SizedBox(height: 12),
-          const Text(
-            'Ajouter un contact internet',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          // En-tête type WhatsApp
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: AppColors.accent,
+                  child: const Icon(Icons.person_add_alt_1, color: Colors.white),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Par numéro de téléphone',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700, fontSize: 16),
+                      ),
+                      Text(
+                        kIsWeb
+                            ? 'Sur le web, UpChat fonctionne comme WhatsApp : le numéro identifie le contact.'
+                            : 'Mode internet : trouve un contact à distance par son numéro.',
+                        style: TextStyle(
+                            color: Colors.grey.shade600, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            connectivity.internetModeEnabled
-                ? 'Saisis le numéro enregistré par ton contact sur UpChat.'
-                : 'Le mode internet est désactivé. Active-le dans Réglages pour utiliser cette fonction.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade600, height: 1.35),
-          ),
-          const SizedBox(height: 28),
+
+          if (!hasMyPhone) ...[
+            const SizedBox(height: 16),
+            Material(
+              color: Colors.orange.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+              child: ListTile(
+                leading: const Icon(Icons.warning_amber_rounded,
+                    color: Colors.orange),
+                title: const Text('Ton numéro n’est pas enregistré'),
+                subtitle: const Text(
+                    'Indispensable pour que les autres puissent te trouver'),
+                trailing: TextButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRouter.profile),
+                  child: const Text('Profil'),
+                ),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 12),
+            Text(
+              'Connecté en tant que ${profile.phoneNumber}',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ],
+
+          const SizedBox(height: 24),
           TextField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
+            autofocus: true,
             enabled: !_loading,
             decoration: const InputDecoration(
               labelText: 'Numéro de téléphone',
               hintText: '+237 6XX XXX XXX',
               prefixIcon: Icon(Icons.phone),
+              helperText: 'Indicatif pays recommandé (ex. +237)',
             ),
-            onSubmitted: (_) => _search(),
+            onSubmitted: (_) => _startChat(),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _nameController,
+            textCapitalization: TextCapitalization.words,
+            enabled: !_loading,
+            decoration: const InputDecoration(
+              labelText: 'Nom du contact (optionnel)',
+              hintText: 'Comme dans ton carnet',
+              prefixIcon: Icon(Icons.badge_outlined),
+            ),
+            onSubmitted: (_) => _startChat(),
+          ),
+
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: const TextStyle(color: Colors.redAccent, height: 1.3),
-            ),
+            Text(_error!,
+                style: const TextStyle(color: Colors.redAccent, height: 1.3)),
           ],
+          if (_info != null) ...[
+            const SizedBox(height: 12),
+            Text(_info!,
+                style: TextStyle(color: Colors.grey.shade700, height: 1.3)),
+          ],
+
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _loading || !connectivity.internetModeEnabled
-                  ? null
-                  : _search,
+              onPressed: _loading ? null : _startChat,
               icon: _loading
                   ? const SizedBox(
                       width: 18,
@@ -155,8 +277,8 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
                       child: CircularProgressIndicator(
                           strokeWidth: 2, color: Colors.white),
                     )
-                  : const Icon(Icons.search),
-              label: Text(_loading ? 'Recherche…' : 'Rechercher'),
+                  : const Icon(Icons.chat_rounded),
+              label: Text(_loading ? 'Ouverture…' : 'Démarrer la discussion'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.accent,
                 foregroundColor: Colors.white,
@@ -167,6 +289,7 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
               ),
             ),
           ),
+
           if (known.isNotEmpty) ...[
             const SizedBox(height: 32),
             const Text(
@@ -182,12 +305,12 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
                   child: Text(
                     u.name.isNotEmpty ? u.name[0].toUpperCase() : '?',
                     style: const TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.bold),
+                        color: AppColors.primary, fontWeight: FontWeight.bold),
                   ),
                 ),
                 title: Text(u.name),
                 subtitle: Text(u.phoneNumber ?? ''),
+                trailing: const Icon(Icons.chat_bubble_outline, size: 20),
                 onTap: () {
                   final conv =
                       context.read<ChatProvider>().getOrCreateConversation(
@@ -207,6 +330,9 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
               );
             }),
           ],
+
+          // ignore unused uuid warning path — reserved for future server-assigned ids
+          if (false) Text(_uuid.v4()),
         ],
       ),
     );
