@@ -32,11 +32,15 @@ jobs:
       - name: Ensure Android platform files
         run: |
           flutter create --platforms=android,web . --project-name upchat || true
+          # Restaure nos configs custom (ne pas écraser Gradle 8.7 ni le manifest)
           git checkout -- android/app/src/main/AndroidManifest.xml || true
           git checkout -- android/app/build.gradle || true
           git checkout -- android/build.gradle || true
           git checkout -- android/settings.gradle || true
+          git checkout -- android/gradle/wrapper/gradle-wrapper.properties || true
           git checkout -- android/app/src/main/kotlin/com/upchat/app/MainActivity.kt || true
+          echo "Gradle wrapper:"
+          cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build APK (arm64)
         run: flutter build apk --release --target-platform android-arm64 --split-per-abi
@@ -69,6 +73,8 @@ jobs:
       - name: Ensure Web platform files
         run: |
           flutter create --platforms=web . --project-name upchat || true
+          # Conserve notre index.html / manifest si présents
+          git checkout -- web/index.html web/manifest.json || true
 
       - name: Build Flutter Web for /app/
         run: |
@@ -109,7 +115,6 @@ jobs:
           echo "${{ github.sha }}" > /tmp/upchat-web/app/.last_build_id
           echo "${{ github.sha }}" > /tmp/upchat-web/.upchat-source-sha
           date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/upchat-web/app/.deployed_at
-          # Keep vercel routing healthy (do not rewrite static assets)
           cat > /tmp/upchat-web/vercel.json << 'EOF'
           {
             "cleanUrls": false,
@@ -129,7 +134,6 @@ jobs:
             ]
           }
           EOF
-          # Preserve existing landing page if present, else create redirect
           if [ ! -f /tmp/upchat-web/index.html ] || ! grep -q "upchat\|UpChat" /tmp/upchat-web/index.html 2>/dev/null; then
             cat > /tmp/upchat-web/index.html << 'EOF'
           <!DOCTYPE html><html><head>

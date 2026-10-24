@@ -1,10 +1,17 @@
 {
-  "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version",
-  "framework": null,
-  "buildCommand": "export PATH=\"/tmp/flutter/bin:$PATH\" && flutter pub get && flutter build web --release --base-href /",
+  "buildCommand": "flutter create . --platforms web --project-name upchat && flutter pub get && flutter build web --release --base-href /",
   "outputDirectory": "build/web",
-  "routes": [
-    { "handle": "filesystem" },
-    { "src": "/(.*)", "dest": "/index.html" }
+  "framework": null,
+  "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version && flutter precache --web",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
   ]
 }
