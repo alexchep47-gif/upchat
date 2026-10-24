@@ -31,9 +31,12 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
+  final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _typingTimer;
   bool _sentTyping = false;
+  bool _searching = false;
+  String _searchQuery = '';
 
   // Emojis rapides style Telegram
   static const _quickEmojis = ['👍', '❤️', '🔥', '😂', '😮', '😢', '👏', '🎉'];
@@ -62,6 +65,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
+    _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -156,63 +160,204 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+  void _startSearch() {
+    setState(() {
+      _searching = true;
+      _searchQuery = '';
+    });
+  }
+
+  void _stopSearch() {
+    setState(() {
+      _searching = false;
+      _searchQuery = '';
+      _searchController.clear();
+    });
+  }
+
+  Future<void> _showChatInfo() async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(widget.peerName),
+        content: SelectableText(
+          'Identifiant du contact\n${widget.peerId}\n\n'
+          'Les messages restent stockés localement et sont transmis via '
+          'les canaux disponibles.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _clearMessages() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Effacer cette conversation ?'),
+        content: const Text(
+          'Les messages seront supprimés de cet appareil. Cette action est irréversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Effacer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await context.read<ChatProvider>().clearConversationMessages(
+            widget.conversationId,
+          );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Messages effacés')),
+        );
+      }
+    }
+  }
+
+  void _handleMenu(String value) {
+    switch (value) {
+      case 'info':
+        _showChatInfo();
+        break;
+      case 'clear':
+        _clearMessages();
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chat = context.watch<ChatProvider>();
     final messages = chat.messagesFor(widget.conversationId);
+    final visibleMessages = _searchQuery.trim().isEmpty
+        ? messages
+        : messages
+            .where((message) => message.content
+                .toLowerCase()
+                .contains(_searchQuery.trim().toLowerCase()))
+            .toList();
     final peerTyping = chat.isTyping(widget.peerId);
 
     return Scaffold(
       extendBodyBehindAppBar: false,
       appBar: AppBar(
         titleSpacing: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundColor: AppColors.primary.withOpacity(0.2),
-              child: Text(
-                widget.peerName.isNotEmpty ? widget.peerName[0].toUpperCase() : '?',
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w700,
+        title: _searching
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                style: TextStyle(
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.peerName,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                    overflow: TextOverflow.ellipsis,
+                decoration: InputDecoration(
+                  hintText: 'Rechercher dans la conversation',
+                  hintStyle: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
-                  AnimatedDefaultTextStyle(
-                    duration: const Duration(milliseconds: 200),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      fontStyle: peerTyping ? FontStyle.italic : FontStyle.normal,
-                      color: peerTyping
-                          ? AppColors.primary
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                  border: InputBorder.none,
+                ),
+              )
+            : Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.primary.withOpacity(0.2),
+                    child: Text(
+                      widget.peerName.isNotEmpty
+                          ? widget.peerName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    child: Text(peerTyping ? 'écrit…' : 'à proximité'),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.peerName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        AnimatedDefaultTextStyle(
+                          duration: const Duration(milliseconds: 200),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                            fontStyle: peerTyping
+                                ? FontStyle.italic
+                                : FontStyle.normal,
+                            color: peerTyping
+                                ? AppColors.primary
+                                : (isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight),
+                          ),
+                          child: Text(peerTyping ? 'écrit…' : 'à proximité'),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded),
-            onPressed: () {},
-          ),
-        ],
+        actions: _searching
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: _stopSearch,
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Rechercher',
+                  onPressed: _startSearch,
+                ),
+                PopupMenuButton<String>(
+                  onSelected: _handleMenu,
+                  itemBuilder: (context) => const [
+                    PopupMenuItem(
+                      value: 'info',
+                      child: ListTile(
+                        leading: Icon(Icons.info_outline_rounded),
+                        title: Text('Informations'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'clear',
+                      child: ListTile(
+                        leading: Icon(Icons.delete_outline_rounded),
+                        title: Text('Effacer les messages'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -224,10 +369,18 @@ class _ChatScreenState extends State<ChatScreen> {
                 : [const Color(0xFFE8F0E3), const Color(0xFFD4E5C8)],
           ),
         ),
-        child: Column(
-          children: [
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final contentWidth = constraints.maxWidth > 900
+                ? 860.0
+                : constraints.maxWidth;
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: Column(
+                  children: [
             Expanded(
-              child: messages.isEmpty
+              child: visibleMessages.isEmpty
                   ? const EmptyState(
                       icon: Icons.lock_outline_rounded,
                       title: 'Conversation sécurisée 🔒',
@@ -237,10 +390,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   : ListView.builder(
                       controller: _scrollController,
                       padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-                      itemCount: messages.length,
+                      itemCount: visibleMessages.length,
                       itemBuilder: (context, index) {
                         return _TelegramBubble(
-                          message: messages[index],
+                          message: visibleMessages[index],
                           isDark: isDark,
                         );
                       },
@@ -391,7 +544,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
-          ],
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

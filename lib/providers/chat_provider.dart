@@ -322,6 +322,29 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> clearConversationMessages(String conversationId) async {
+    final messages = _messages.remove(conversationId) ?? [];
+    for (final message in messages) {
+      await StorageService.messages.delete(message.id);
+    }
+
+    final index = _conversations.indexWhere((c) => c.id == conversationId);
+    if (index != -1) {
+      final conversation = _conversations[index];
+      final cleared = ConversationModel(
+        id: conversation.id,
+        title: conversation.title,
+        photoPath: conversation.photoPath,
+        isGroup: conversation.isGroup,
+        participantIds: conversation.participantIds,
+        peerEndpointId: conversation.peerEndpointId,
+      );
+      _conversations[index] = cleared;
+      await StorageService.conversations.put(conversationId, cleared.toMap());
+    }
+    notifyListeners();
+  }
+
   void sendTyping(String endpointId, bool isTyping) {
     _nearby.sendTyping(endpointId, isTyping);
   }

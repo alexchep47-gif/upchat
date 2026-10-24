@@ -77,52 +77,74 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
         backgroundColor: AppColors.backgroundDark,
         body: SafeArea(
           bottom: false,
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: _HomeHeader(
-                  onProfile: _openProfile,
-                  onNearby: _showNearbyStatus,
-                  onNewChat: _openNewChat,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = constraints.maxWidth >= 900
+                  ? 760.0
+                  : constraints.maxWidth;
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: contentWidth,
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: _HomeHeader(
+                          onProfile: _openProfile,
+                          onNearby: _showNearbyStatus,
+                          onNewChat: _openNewChat,
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _ConversationTabs(
+                          selectedIndex: _selectedTab,
+                          peopleCount: peopleCount,
+                          groupCount: groupCount,
+                          nearbyCount: nearbyCount,
+                          onChanged: (index) =>
+                              setState(() => _selectedTab = index),
+                        ),
+                      ),
+                      SliverToBoxAdapter(
+                        child: _InfoBanner(
+                          connectivity: connectivity,
+                          nearby: nearby,
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: StoriesBar()),
+                      if (!hasContent)
+                        SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: _EmptyConversationState(onNewChat: _openNewChat),
+                        )
+                      else
+                        _ConversationSliver(
+                          nearby: nearby,
+                          chat: chat,
+                          selectedTab: _selectedTab,
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 92)),
+                    ],
+                  ),
                 ),
-              ),
-              SliverToBoxAdapter(
-                child: _ConversationTabs(
-                  selectedIndex: _selectedTab,
-                  peopleCount: peopleCount,
-                  groupCount: groupCount,
-                  nearbyCount: nearbyCount,
-                  onChanged: (index) => setState(() => _selectedTab = index),
-                ),
-              ),
-              SliverToBoxAdapter(
-                child: _InfoBanner(
-                  connectivity: connectivity,
-                  nearby: nearby,
-                ),
-              ),
-              const SliverToBoxAdapter(child: StoriesBar()),
-              if (!hasContent)
-                SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyConversationState(onNewChat: _openNewChat),
-                )
-              else
-                _ConversationSliver(
-                  nearby: nearby,
-                  chat: chat,
-                  selectedTab: _selectedTab,
-                ),
-              const SliverToBoxAdapter(child: SizedBox(height: 92)),
-            ],
+              );
+            },
           ),
         ),
-        bottomNavigationBar: _BottomNavigation(
-          selectedIndex: 2,
-          onProfile: _openProfile,
-          onNearby: _showNearbyStatus,
-          onHome: () => setState(() => _selectedTab = 0),
-          onSettings: _openSettings,
+        bottomNavigationBar: Container(
+          color: AppColors.backgroundDark,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: _BottomNavigation(
+                selectedIndex: 2,
+                onProfile: _openProfile,
+                onNearby: _showNearbyStatus,
+                onHome: () => setState(() => _selectedTab = 0),
+                onSettings: _openSettings,
+              ),
+            ),
+          ),
         ),
       ),
     );
