@@ -1,0 +1,49 @@
+# syntax=docker/dockerfile:1
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV PATH="${PATH}:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator:${ANDROID_HOME}/tools/bin:/flutter/bin:/flutter/bin/cache/dart-sdk/bin"
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    ca-certificates \
+    curl \
+    git \
+    unzip \
+    xz-utils \
+    zip \
+    openjdk-17-jdk \
+    libc6-dev \
+    libstdc++6 \
+    libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Flutter SDK
+RUN git clone https://github.com/flutter/flutter.git -b stable /flutter
+RUN flutter config --no-analytics
+
+# Install Android SDK command-line tools and API level packages
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip && \
+    unzip -q /tmp/cmdline-tools.zip -d /tmp && \
+    mv /tmp/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
+    yes | sdkmanager --licenses && \
+    sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" "build-tools;33.0.0"
+
+# Copy project files
+COPY . .
+
+RUN flutter pub get
+
+# Build debug APK by default. Replace with --release if you need a signed release build.
+RUN flutter build apk --debug
+
+# Optional: app bundle
+# RUN flutter build appbundle --release
+
+# Final output location inside the image:
+# /app/build/app/outputs/flutter-apk/app-debug.apk
