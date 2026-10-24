@@ -14,8 +14,9 @@ class PhoneContactDialog extends StatefulWidget {
 
 class _PhoneContactDialogState extends State<PhoneContactDialog> {
   final _controller = TextEditingController();
-  final _directory = ContactDirectoryService();
+  final _directory = ContactDirectoryService.instance;
   String? _error;
+  bool _isOpening = false;
 
   @override
   void dispose() {
@@ -23,10 +24,22 @@ class _PhoneContactDialogState extends State<PhoneContactDialog> {
     super.dispose();
   }
 
-  void _openChat() {
-    final user = _directory.findByPhone(_controller.text);
+  Future<void> _openChat() async {
+    if (_isOpening) return;
+    setState(() {
+      _isOpening = true;
+      _error = null;
+    });
+    final user = _directory.findByPhone(
+      _controller.text,
+      excludingUserId: context.read<ChatProvider>().currentUserId,
+    );
+    if (!mounted) return;
     if (user == null) {
-      setState(() => _error = 'Aucun utilisateur enregistré avec ce numéro.');
+      setState(() {
+        _isOpening = false;
+        _error = 'Aucun utilisateur enregistré avec ce numéro.';
+      });
       return;
     }
     final conversation = context.read<ChatProvider>().getOrCreateConversation(
@@ -34,6 +47,7 @@ class _PhoneContactDialogState extends State<PhoneContactDialog> {
           peerName: user.name,
           endpointId: user.endpointId,
         );
+    if (!mounted) return;
     Navigator.pop(context);
     Navigator.pushNamed(context, AppRouter.chat, arguments: {
       'conversationId': conversation.id,
@@ -60,8 +74,8 @@ class _PhoneContactDialogState extends State<PhoneContactDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Annuler')),
-        FilledButton(onPressed: _openChat, child: const Text('Ouvrir')),
+        TextButton(onPressed: _isOpening ? null : () => Navigator.pop(context), child: const Text('Annuler')),
+        FilledButton(onPressed: _isOpening ? null : _openChat, child: const Text('Ouvrir')),
       ],
     );
   }

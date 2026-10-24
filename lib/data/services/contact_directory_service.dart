@@ -6,20 +6,24 @@ import 'storage_service.dart';
 /// sans modifier l'interface utilisateur.
 class ContactDirectoryService {
   static const int minimumPhoneDigits = 6;
+  static final ContactDirectoryService instance = ContactDirectoryService._();
 
-  List<UserModel> searchByPhone(String query) {
+  ContactDirectoryService._();
+
+  List<UserModel> searchByPhone(String query, {String? excludingUserId}) {
     final normalized = UserModel.normalizePhone(query);
     if (_digitsOnly(normalized).length < minimumPhoneDigits) return const [];
 
     return StorageService.users.values
         .whereType<Map>()
         .map((value) => UserModel.fromMap(Map<String, dynamic>.from(value)))
+        .where((user) => user.id != excludingUserId)
         .where((user) => _matches(user.phoneNumber, normalized))
         .toList(growable: false);
   }
 
-  UserModel? findByPhone(String phoneNumber) {
-    final matches = searchByPhone(phoneNumber);
+  UserModel? findByPhone(String phoneNumber, {String? excludingUserId}) {
+    final matches = searchByPhone(phoneNumber, excludingUserId: excludingUserId);
     return matches.isEmpty ? null : matches.first;
   }
 

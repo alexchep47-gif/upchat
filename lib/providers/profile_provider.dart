@@ -53,7 +53,7 @@ class ProfileProvider extends ChangeNotifier {
     final normalized = newPhone == null ? null : UserModel.normalizePhone(newPhone);
     _phoneNumber = normalized == '' ? null : normalized;
     await StorageService.setUserPhone(_phoneNumber);
-    _syncDirectoryRecord();
+    await _syncDirectoryRecord();
     notifyListeners();
   }
 
@@ -65,7 +65,7 @@ class ProfileProvider extends ChangeNotifier {
       bio: _bio,
       photoPath: _photoPath,
     );
-    await ContactDirectoryService().upsert(user);
+    await ContactDirectoryService.instance.upsert(user);
   }
 
   Future<void> updateBio(String? newBio) async {

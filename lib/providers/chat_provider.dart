@@ -18,6 +18,7 @@ class ChatProvider extends ChangeNotifier {
   final Map<String, bool> _typingUsers = {}; // userId → isTyping
 
   List<ConversationModel> get conversations => List.unmodifiable(_conversations);
+  String get currentUserId => StorageService.userId;
   bool isTyping(String userId) => _typingUsers[userId] ?? false;
 
   List<MessageModel> messagesFor(String conversationId) {
