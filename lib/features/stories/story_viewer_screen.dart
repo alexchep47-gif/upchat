@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/models/story_model.dart';
@@ -214,15 +216,89 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   }
 }
 
-class _StoryContent extends StatelessWidget {
+class _StoryContent extends StatefulWidget {
   final StoryModel story;
 
   const _StoryContent({required this.story});
 
   @override
+  State<_StoryContent> createState() => _StoryContentState();
+}
+
+class _StoryContentState extends State<_StoryContent> {
+  VideoPlayerController? _videoController;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVideo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _StoryContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.story.mediaPath != widget.story.mediaPath) {
+      _videoController?.dispose();
+      _videoController = null;
+      _loadVideo();
+    }
+  }
+
+  Future<void> _loadVideo() async {
+    if (widget.story.type != StoryType.video || widget.story.mediaPath == null) {
+      return;
+    }
+    final path = widget.story.mediaPath!;
+    final controller = kIsWeb
+        ? VideoPlayerController.networkUrl(Uri.parse(path))
+        : VideoPlayerController.file(File(path));
+    _videoController = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(true);
+      await controller.play();
+      if (mounted) setState(() {});
+    } catch (_) {
+      await controller.dispose();
+      if (identical(_videoController, controller)) _videoController = null;
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (story.type == StoryType.image && story.mediaPath != null && !kIsWeb) {
-      return Image.file(File(story.mediaPath!), fit: BoxFit.contain);
+    final story = widget.story;
+    if (story.type == StoryType.image && story.mediaPath != null) {
+      if (story.mediaPath!.startsWith('data:image/')) {
+        try {
+          return Image.memory(
+            base64Decode(story.mediaPath!.substring(story.mediaPath!.indexOf(',') + 1)),
+            fit: BoxFit.contain,
+          );
+        } catch (_) {}
+      } else if (!kIsWeb) {
+        return Image.file(File(story.mediaPath!), fit: BoxFit.contain);
+      }
+    }
+    if (story.type == StoryType.video && _videoController != null) {
+      final controller = _videoController!;
+      if (controller.value.isInitialized) {
+        return Center(
+          child: AspectRatio(
+            aspectRatio: controller.value.aspectRatio,
+            child: VideoPlayer(controller),
+          ),
+        );
+      }
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
     }
     return Center(
       child: Padding(

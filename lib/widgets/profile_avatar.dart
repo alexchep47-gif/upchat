@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
 import '../core/theme/app_colors.dart';
 
-/// Avatar réutilisable : affiche la photo de profil si disponible, sinon l'initiale
+/// Avatar réutilisable : affiche la photo locale ou la data URI Web.
 class ProfileAvatar extends StatelessWidget {
   final String name;
   final String? photoPath;
@@ -16,28 +19,50 @@ class ProfileAvatar extends StatelessWidget {
     this.radius = 24,
   });
 
+  Widget _fallback(String initial) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.primary,
+      child: Text(
+        initial,
+        style: TextStyle(
+          fontSize: radius * 0.7,
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+    final path = photoPath;
+    if (path == null || path.isEmpty) return _fallback(initial);
 
-    // Sur le web, les chemins fichiers locaux ne marchent pas
-    if (kIsWeb || photoPath == null || photoPath!.isEmpty) {
-      return CircleAvatar(
-        radius: radius,
-        backgroundColor: AppColors.primary,
-        child: Text(
-          initial,
-          style: TextStyle(
-            fontSize: radius * 0.7,
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
+    if (path.startsWith('data:image/')) {
+      try {
+        final encoded = path.substring(path.indexOf(',') + 1);
+        return CircleAvatar(
+          radius: radius,
+          backgroundColor: AppColors.primary,
+          child: ClipOval(
+            child: Image.memory(
+              base64Decode(encoded),
+              width: radius * 2,
+              height: radius * 2,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _fallback(initial),
+            ),
           ),
-        ),
-      );
+        );
+      } catch (_) {
+        return _fallback(initial);
+      }
     }
 
-    final file = File(photoPath!);
-
+    if (kIsWeb) return _fallback(initial);
+    final file = File(path);
     return CircleAvatar(
       radius: radius,
       backgroundColor: AppColors.primary,
@@ -47,38 +72,7 @@ class ProfileAvatar extends StatelessWidget {
           width: radius * 2,
           height: radius * 2,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) {
-            return Container(
-              width: radius * 2,
-              height: radius * 2,
-              color: AppColors.primary,
-              alignment: Alignment.center,
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: radius * 0.7,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            );
-          },
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded || frame != null) return child;
-            return Container(
-              width: radius * 2,
-              height: radius * 2,
-              color: AppColors.primary,
-              alignment: Alignment.center,
-              child: Text(
-                initial,
-                style: TextStyle(
-                  fontSize: radius * 0.7,
-                  color: Colors.white,
-                ),
-              ),
-            );
-          },
+          errorBuilder: (_, __, ___) => _fallback(initial),
         ),
       ),
     );

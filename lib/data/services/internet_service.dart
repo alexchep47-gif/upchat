@@ -86,8 +86,10 @@ class InternetService {
   Future<void> _stop() async {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _isOnline = false;
     _isConnectedToSignaling = false;
     _onlinePeers.clear();
+    onConnectivityChanged?.call(false);
     debugPrint('InternetService: mode hybride arrêté');
   }
 

@@ -23,8 +23,8 @@ class MediaHelper {
                 title: const Text('Galerie'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final file = await media.pickImage(fromCamera: false);
-                  if (file != null) onPicked(file.path, 'image');
+                  final path = await media.pickImage(fromCamera: false);
+                  if (path != null) onPicked(path, 'image');
                 },
               ),
               ListTile(
@@ -32,8 +32,8 @@ class MediaHelper {
                 title: const Text('Caméra'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final file = await media.pickImage(fromCamera: true);
-                  if (file != null) onPicked(file.path, 'image');
+                  final path = await media.pickImage(fromCamera: true);
+                  if (path != null) onPicked(path, 'image');
                 },
               ),
               ListTile(
@@ -41,8 +41,8 @@ class MediaHelper {
                 title: const Text('Vidéo'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final file = await media.pickVideo(fromCamera: false);
-                  if (file != null) onPicked(file.path, 'video');
+                  final path = await media.pickVideo(fromCamera: false);
+                  if (path != null) onPicked(path, 'video');
                 },
               ),
               ListTile(

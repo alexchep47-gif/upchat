@@ -46,9 +46,12 @@ class ConnectivityProvider extends ChangeNotifier {
   }
 
   Future<void> setInternetMode(bool enabled) async {
+    _internetModeEnabled = enabled;
+    if (!enabled) _isOnline = false;
+    notifyListeners();
     await _internet.setEnabled(enabled);
     _internetModeEnabled = enabled;
-    _isOnline = _internet.isOnline;
+    _isOnline = enabled && _internet.isOnline;
     notifyListeners();
   }
 }

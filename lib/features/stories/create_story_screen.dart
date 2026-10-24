@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -60,6 +61,40 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
     );
   }
 
+  Widget _mediaPreview() {
+    if (_type == StoryType.image) {
+      if (_mediaPath!.startsWith('data:image/')) {
+        try {
+          return Image.memory(
+            base64Decode(_mediaPath!.substring(_mediaPath!.indexOf(',') + 1)),
+            fit: BoxFit.contain,
+          );
+        } catch (_) {}
+      }
+      if (!kIsWeb) return Image.file(File(_mediaPath!), fit: BoxFit.contain);
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          _type == StoryType.video
+              ? Icons.video_library_rounded
+              : Icons.image_rounded,
+          color: AppColors.accent,
+          size: 72,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _type == StoryType.video
+              ? 'Vidéo prête à publier'
+              : 'Photo prête à publier',
+          style: const TextStyle(color: Colors.white, fontSize: 17),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -81,11 +116,8 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
         children: [
           Expanded(
             child: Center(
-              child: _mediaPath != null && !kIsWeb
-                  ? Image.file(
-                      File(_mediaPath!),
-                      fit: BoxFit.contain,
-                    )
+              child: _mediaPath != null
+                  ? _mediaPreview()
                   : Padding(
                       padding: const EdgeInsets.all(24),
                       child: TextField(

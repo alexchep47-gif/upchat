@@ -1,12 +1,13 @@
+import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
-/// Service de gestion des médias (images, fichiers)
-/// Compression basique des images pour rester léger en P2P
+/// Service de gestion des médias (images, vidéos, fichiers).
 class MediaService {
   static final MediaService _instance = MediaService._internal();
   factory MediaService() => _instance;
@@ -15,41 +16,81 @@ class MediaService {
   final ImagePicker _picker = ImagePicker();
   final Uuid _uuid = const Uuid();
 
-  /// Choisir une image depuis la galerie ou la caméra
-  Future<File?> pickImage({bool fromCamera = false}) async {
+  /// Retourne un chemin local sur mobile ou une data URI persistante sur Web.
+  Future<String?> pickImage({bool fromCamera = false}) async {
     try {
-      final XFile? picked = await _picker.pickImage(
+      final picked = await _picker.pickImage(
         source: fromCamera ? ImageSource.camera : ImageSource.gallery,
         maxWidth: 1280,
         maxHeight: 1280,
-        imageQuality: 70, // compression auto
+        imageQuality: 70,
       );
       if (picked == null) return null;
-
-      // Copie dans le dossier de l'app pour persistance
-      return await _saveToAppDir(File(picked.path), 'images');
+      return _persistPickedFile(picked, 'images', 'image');
     } catch (e) {
       debugPrint('Erreur pickImage: $e');
       return null;
     }
   }
 
-  /// Choisir une vidéo
-  Future<File?> pickVideo({bool fromCamera = false}) async {
+  /// Retourne un chemin local sur mobile ou une data URI persistante sur Web.
+  Future<String?> pickVideo({bool fromCamera = false}) async {
     try {
-      final XFile? picked = await _picker.pickVideo(
+      final picked = await _picker.pickVideo(
         source: fromCamera ? ImageSource.camera : ImageSource.gallery,
         maxDuration: const Duration(minutes: 2),
       );
       if (picked == null) return null;
-      return await _saveToAppDir(File(picked.path), 'videos');
+      return _persistPickedFile(picked, 'videos', 'video');
     } catch (e) {
       debugPrint('Erreur pickVideo: $e');
       return null;
     }
   }
 
-  /// Sauvegarde un fichier dans le dossier permanent de l'app
+  Future<String> _persistPickedFile(
+    XFile picked,
+    String subfolder,
+    String kind,
+  ) async {
+    if (kIsWeb) {
+      final bytes = await picked.readAsBytes();
+      final extension = p.extension(picked.name).toLowerCase();
+      final mime = kind == 'image'
+          ? _imageMime(extension)
+          : _videoMime(extension);
+      return 'data:$mime;base64,${base64Encode(bytes)}';
+    }
+
+    final source = File(picked.path);
+    final saved = await _saveToAppDir(source, subfolder);
+    return saved.path;
+  }
+
+  String _imageMime(String extension) {
+    switch (extension) {
+      case '.png':
+        return 'image/png';
+      case '.webp':
+        return 'image/webp';
+      case '.gif':
+        return 'image/gif';
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  String _videoMime(String extension) {
+    switch (extension) {
+      case '.webm':
+        return 'video/webm';
+      case '.mov':
+        return 'video/quicktime';
+      default:
+        return 'video/mp4';
+    }
+  }
+
   Future<File> _saveToAppDir(File source, String subfolder) async {
     final dir = await getApplicationDocumentsDirectory();
     final targetDir = Directory(p.join(dir.path, 'upchat_media', subfolder));
@@ -60,10 +101,9 @@ class MediaService {
     final ext = p.extension(source.path);
     final filename = '${_uuid.v4()}$ext';
     final target = File(p.join(targetDir.path, filename));
-    return await source.copy(target.path);
+    return source.copy(target.path);
   }
 
-  /// Taille d'un fichier en Ko
   Future<int> fileSizeKb(File file) async {
     final bytes = await file.length();
     return (bytes / 1024).round();

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -95,11 +94,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     try {
       final media = MediaService();
-      final file = await media.pickImage(fromCamera: source == 'camera');
-      if (file != null && mounted) {
-        final exists = await file.exists();
-        if (!exists) throw Exception('Fichier introuvable');
-        await context.read<ProfileProvider>().updatePhoto(file.path);
+      final path = await media.pickImage(fromCamera: source == 'camera');
+      if (path != null && mounted) {
+        await context.read<ProfileProvider>().updatePhoto(path);
         setState(() {});
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

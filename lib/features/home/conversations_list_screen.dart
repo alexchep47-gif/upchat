@@ -29,9 +29,6 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final connectivity = context.read<ConnectivityProvider>();
-      if (kIsWeb && !connectivity.internetModeEnabled) {
-        connectivity.setInternetMode(true);
-      }
       if (!kIsWeb) {
         context.read<NearbyProvider>().start();
       }
@@ -362,16 +359,21 @@ class _InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final title = kIsWeb || connectivity.isHybridReady
-        ? 'Mode internet activé'
+    final internetEnabled = connectivity.internetModeEnabled;
+    final title = internetEnabled && connectivity.isOnline
+        ? 'Mode internet actif'
+        : internetEnabled
+            ? 'Mode internet activé — en attente'
         : nearby.isRunning
             ? 'Appareils proches disponibles'
-            : 'Votre espace de discussions';
-    final subtitle = kIsWeb || connectivity.isHybridReady
+            : 'Mode internet inactif';
+    final subtitle = internetEnabled && connectivity.isOnline
         ? 'Les contacts peuvent être trouvés par numéro.'
+        : internetEnabled
+            ? 'Le réseau sera utilisé dès qu’il sera disponible.'
         : nearby.isRunning
             ? '${nearby.nearbyDevices.length} appareil(s) détecté(s) autour de vous.'
-            : 'Démarrez une discussion avec un contact.';
+            : 'Les discussions restent en mode local.';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
@@ -384,7 +386,7 @@ class _InfoBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            kIsWeb || connectivity.isHybridReady
+            internetEnabled && connectivity.isOnline
                 ? Icons.public_rounded
                 : Icons.wifi_tethering_rounded,
             color: AppColors.primary,
@@ -415,12 +417,16 @@ class _InfoBanner extends StatelessWidget {
             ),
           ),
           Icon(
-            connectivity.isHybridReady || kIsWeb
+            internetEnabled && connectivity.isOnline
                 ? Icons.check_circle_rounded
-                : Icons.info_outline_rounded,
-            color: connectivity.isHybridReady || kIsWeb
+                : internetEnabled
+                    ? Icons.schedule_rounded
+                    : Icons.cloud_off_rounded,
+            color: internetEnabled && connectivity.isOnline
                 ? AppColors.online
-                : AppColors.textSecondaryDark,
+                : internetEnabled
+                    ? AppColors.primary
+                    : AppColors.textSecondaryDark,
             size: 21,
           ),
         ],
