@@ -34,15 +34,17 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
   void initState() {
     super.initState();
     _stories = context.read<StoriesProvider>().storiesForUser(widget.userId);
-    _currentIndex = widget.initialIndex.clamp(0, _stories.isEmpty ? 0 : _stories.length - 1);
+    _currentIndex = widget.initialIndex.clamp(
+      0,
+      _stories.isEmpty ? 0 : _stories.length - 1,
+    );
     _startProgress();
 
-    // Marque comme vue
     if (_stories.isNotEmpty) {
       context.read<StoriesProvider>().markViewed(
-            _stories[_currentIndex].id,
-            StorageService.userId,
-          );
+        _stories[_currentIndex].id,
+        StorageService.userId,
+      );
     }
   }
 
@@ -57,7 +59,7 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     _progress = 0;
     _timer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
       setState(() {
-        _progress += 0.05 / 5; // ~5 secondes par story
+        _progress += 0.05 / 5;
         if (_progress >= 1) {
           _next();
         }
@@ -72,9 +74,9 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
         _progress = 0;
       });
       context.read<StoriesProvider>().markViewed(
-            _stories[_currentIndex].id,
-            StorageService.userId,
-          );
+        _stories[_currentIndex].id,
+        StorageService.userId,
+      );
       _startProgress();
     } else {
       Navigator.pop(context);
@@ -96,7 +98,12 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
     if (_stories.isEmpty) {
       return const Scaffold(
         backgroundColor: Colors.black,
-        body: Center(child: Text('Aucune story', style: TextStyle(color: Colors.white))),
+        body: Center(
+          child: Text(
+            'Aucune story',
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
       );
     }
 
@@ -116,7 +123,6 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Contenu
             if (story.type == StoryType.image && story.mediaPath != null && !kIsWeb)
               Image.file(File(story.mediaPath!), fit: BoxFit.contain)
             else
@@ -130,3 +136,58 @@ class _StoryViewerScreenState extends State<StoryViewerScreen> {
                       fontSize: 28,
                       fontWeight: FontWeight.w500,
                     ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 40,
+              left: 16,
+              right: 16,
+              child: Row(
+                children: List.generate(_stories.length, (index) {
+                  final active = index <= _currentIndex;
+                  return Expanded(
+                    child: Container(
+                      height: 3,
+                      margin: EdgeInsets.only(
+                        right: index < _stories.length - 1 ? 4 : 0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? Colors.white.withOpacity(0.9)
+                            : Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+            Positioned(
+              top: 48,
+              right: 16,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 32,
+              child: Text(
+                story.userName,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
