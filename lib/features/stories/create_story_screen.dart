@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/media_helper.dart';
+import '../../widgets/responsive_content.dart';
 import '../../data/models/story_model.dart';
 import '../../providers/stories_provider.dart';
 
@@ -112,8 +113,9 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: ResponsiveContent(
+        child: Column(
+          children: [
           Expanded(
             child: Center(
               child: _mediaPath != null
@@ -161,7 +163,8 @@ class _CreateStoryScreenState extends State<CreateStoryScreen> {
               ),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

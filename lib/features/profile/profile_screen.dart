@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../widgets/responsive_content.dart';
 import '../../data/services/media_service.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/profile_avatar.dart';
@@ -136,9 +137,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
+      body: ResponsiveContent(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
           Center(
             child: Stack(
               children: [
@@ -232,7 +234,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             subtitle:
                 Text(profile.userId, style: const TextStyle(fontSize: 12)),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

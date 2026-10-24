@@ -8,10 +8,12 @@ class NearbyProvider extends ChangeNotifier {
   final NearbyService _service = NearbyService();
 
   bool _isRunning = false;
+  String? _error;
   List<UserModel> _devices = [];
   final Map<String, String> _connected = {}; // endpointId → userId
 
   bool get isRunning => _isRunning;
+  String? get error => _error;
   bool get isDiscovering => _service.isDiscovering;
   bool get isAdvertising => _service.isAdvertising;
   List<UserModel> get nearbyDevices => List.unmodifiable(_devices);
@@ -34,17 +36,23 @@ class NearbyProvider extends ChangeNotifier {
   }
 
   /// Démarre la découverte + publicité
-  Future<void> start() async {
-    if (_isRunning) return;
-    await _service.start();
-    _isRunning = true;
+  Future<bool> start() async {
+    if (_isRunning) return true;
+    _error = null;
+    final started = await _service.start();
+    _isRunning = started;
+    if (!started) {
+      _error = 'Bluetooth et les autorisations de proximité sont nécessaires.';
+    }
     notifyListeners();
+    return started;
   }
 
   /// Arrête tout
   Future<void> stop() async {
     await _service.stop();
     _isRunning = false;
+    _error = null;
     _devices = [];
     _connected.clear();
     notifyListeners();

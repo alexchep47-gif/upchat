@@ -27,10 +27,17 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final connectivity = context.read<ConnectivityProvider>();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!kIsWeb) {
-        context.read<NearbyProvider>().start();
+        final started = await context.read<NearbyProvider>().start();
+        if (!started && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'Active le Bluetooth et autorise la proximité pour découvrir des contacts.'),
+            ),
+          );
+        }
       }
     });
   }

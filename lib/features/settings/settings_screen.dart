@@ -7,6 +7,7 @@ import '../../data/services/storage_service.dart';
 import '../../data/services/cleanup_service.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../widgets/responsive_content.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -92,8 +93,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Réglages')),
-      body: ListView(
-        children: [
+      body: ResponsiveContent(
+        child: ListView(
+          children: [
           // Mode internet
           const ListTile(
             title: Text('Connexion', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -285,7 +287,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             isThreeLine: true,
             onTap: _showAbout,
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

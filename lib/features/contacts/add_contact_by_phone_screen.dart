@@ -11,6 +11,7 @@ import '../../data/services/storage_service.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/profile_provider.dart';
+import '../../widgets/responsive_content.dart';
 
 /// Nouvelle discussion par numéro — flux de contact rapide
 ///
@@ -151,9 +152,10 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
       appBar: AppBar(
         title: const Text('Nouvelle discussion'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
+      body: ResponsiveContent(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -280,7 +282,8 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
             ),
           ),
 
-        ],
+          ],
+        ),
       ),
     );
   }

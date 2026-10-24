@@ -9,6 +9,7 @@ import '../../data/services/storage_service.dart';
 import '../../providers/nearby_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../core/routes/app_router.dart';
+import '../../widgets/responsive_content.dart';
 
 /// Création d'un groupe offline
 class CreateGroupScreen extends StatefulWidget {
@@ -89,8 +90,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: ResponsiveContent(
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -151,7 +153,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
                     },
                   ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

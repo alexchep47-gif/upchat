@@ -64,6 +64,14 @@ class InternetService {
   }
 
   Future<void> loadPreference() async {
+    _outbox.clear();
+    for (final key in StorageService.messages.keys) {
+      if (!key.toString().startsWith('outbox_')) continue;
+      final value = StorageService.messages.get(key);
+      if (value is Map) {
+        _outbox.add(Map<String, dynamic>.from(value));
+      }
+    }
     _enabled = StorageService.settings
             .get(AppConstants.keyInternetMode, defaultValue: false) as bool;
     if (_enabled) await _start();
@@ -71,15 +79,17 @@ class InternetService {
 
   Future<void> _start() async {
     debugPrint('InternetService: démarrage du mode hybride');
-    _isOnline = !kIsWeb;
-    if (kIsWeb) _isOnline = true;
+    _isOnline = false;
+    _isConnectedToSignaling = false;
+    await _connectSignaling();
 
-    onConnectivityChanged?.call(_isOnline);
-
-    if (_isOnline) {
-      await _connectSignaling();
+    if (_isConnectedToSignaling) {
+      _isOnline = true;
+      onConnectivityChanged?.call(true);
       await _flushOutbox();
       _startHeartbeat();
+    } else {
+      onConnectivityChanged?.call(false);
     }
   }
 
@@ -118,13 +128,11 @@ class InternetService {
       } else {
         debugPrint(
             'InternetService: register HTTP ${res.statusCode} ${res.body}');
-        // Stub local si le serveur n'est pas encore déployé
-        _isConnectedToSignaling = true;
+        _isConnectedToSignaling = false;
       }
     } catch (e) {
       debugPrint('InternetService: erreur signalisation: $e');
-      // Mode dégradé : on reste "connecté" localement pour ne pas bloquer l'UI
-      _isConnectedToSignaling = true;
+      _isConnectedToSignaling = false;
     }
   }
 
@@ -219,8 +227,7 @@ class InternetService {
     };
 
     if (!_isOnline || !_isConnectedToSignaling) {
-      _outbox.add(payload);
-      await StorageService.messages.put('outbox_${payload['id']}', payload);
+      _queuePayload(payload);
       debugPrint("InternetService: message mis en file d'attente (hors ligne)");
       return false;
     }
@@ -244,13 +251,21 @@ class InternetService {
         return true;
       }
       debugPrint('InternetService: transmit HTTP ${res.statusCode}');
-      // Fallback accepté en dev si API pas encore live
-      return true;
+      _queuePayload(payload);
+      return false;
     } catch (e) {
       debugPrint('InternetService: échec transmission: $e');
-      _outbox.add(payload);
+      _queuePayload(payload);
       return false;
     }
+  }
+
+  void _queuePayload(Map<String, dynamic> payload) {
+    final id = payload['id'];
+    if (!_outbox.any((item) => item['id'] == id)) {
+      _outbox.add(payload);
+    }
+    StorageService.messages.put('outbox_$id', payload);
   }
 
   Future<void> _flushOutbox() async {
@@ -261,9 +276,7 @@ class InternetService {
 
     for (final payload in pending) {
       final ok = await _transmit(payload);
-      if (!ok) {
-        _outbox.add(payload);
-      } else {
+      if (ok) {
         await StorageService.messages.delete('outbox_${payload['id']}');
       }
     }

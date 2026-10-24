@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/permission_helper.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
@@ -42,10 +43,16 @@ class NearbyService {
   List<UserModel> get discoveredDevices => _discovered.values.toList();
   Map<String, String> get connectedEndpoints => Map.unmodifiable(_connected);
 
-  Future<void> start() async {
+  Future<bool> start() async {
+    if (kIsWeb) return false;
+    if (!await PermissionHelper.hasNearbyPermissions()) {
+      debugPrint('NearbyService: permissions Bluetooth/localisation manquantes');
+      return false;
+    }
+
     final userName = StorageService.userName;
     try {
-      _isAdvertising = await _nearby.startAdvertising(
+      final advertising = await _nearby.startAdvertising(
         userName,
         Strategy.P2P_CLUSTER,
         onConnectionInitiated: _onConnectionInitiated,
@@ -54,7 +61,7 @@ class NearbyService {
         serviceId: AppConstants.serviceId,
       );
 
-      _isDiscovering = await _nearby.startDiscovery(
+      final discovering = await _nearby.startDiscovery(
         userName,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (endpointId, endpointName, serviceId) {
@@ -72,10 +79,14 @@ class NearbyService {
         },
         serviceId: AppConstants.serviceId,
       );
+      _isAdvertising = advertising;
+      _isDiscovering = discovering;
+      return advertising && discovering;
     } catch (e) {
       debugPrint('Erreur Nearby start: $e');
       _isAdvertising = false;
       _isDiscovering = false;
+      return false;
     }
   }
 
