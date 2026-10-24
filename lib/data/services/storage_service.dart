@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -25,7 +26,7 @@ class StorageService {
 
     if (encryptionKey == null) {
       // Première installation → génère une clé AES 256 bits
-      final key = base64Url.encode(List<int>.generate(32, (i) => DateTime.now().microsecondsSinceEpoch % 256 + i));
+      final key = base64Url.encode(List<int>.generate(32, (_) => _secureRandomByte()));
       await _secureStorage.write(key: AppConstants.keyEncryptionKey, value: key);
       encryptionKey = key;
     }
@@ -46,6 +47,8 @@ class StorageService {
       await _settingsBox.put(AppConstants.keyUserId, userId);
     }
   }
+
+  static int _secureRandomByte() => Random.secure().nextInt(256);
 
   // ─── Getters des boîtes ───────────────────────────────────
   static Box get settings => _settingsBox;

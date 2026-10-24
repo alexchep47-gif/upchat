@@ -25,6 +25,8 @@ class NearbyService {
 
   bool _isAdvertising = false;
   bool _isDiscovering = false;
+  bool _isStarting = false;
+  bool _isStopping = false;
 
   final Map<String, UserModel> _discovered = {};
   final Map<String, String> _connected = {};
@@ -43,7 +45,11 @@ class NearbyService {
   Map<String, String> get connectedEndpoints => Map.unmodifiable(_connected);
 
   Future<void> start() async {
-    final userName = StorageService.userName;
+    if (_isStarting || (_isAdvertising && _isDiscovering)) return;
+    _isStarting = true;
+    final userName = StorageService.userName.trim().isEmpty
+        ? 'Utilisateur'
+        : StorageService.userName.trim();
     try {
       _isAdvertising = await _nearby.startAdvertising(
         userName,
@@ -76,10 +82,14 @@ class NearbyService {
       debugPrint('Erreur Nearby start: $e');
       _isAdvertising = false;
       _isDiscovering = false;
+    } finally {
+      _isStarting = false;
     }
   }
 
   Future<void> stop() async {
+    if (_isStopping) return;
+    _isStopping = true;
     try {
       await _nearby.stopAdvertising();
       await _nearby.stopDiscovery();
@@ -89,7 +99,9 @@ class NearbyService {
     _isDiscovering = false;
     _discovered.clear();
     _connected.clear();
+    _pendingPayloads.clear();
     onDevicesChanged?.call([]);
+    _isStopping = false;
   }
 
   Future<void> _requestConnection(String endpointId, String userName) async {
@@ -161,8 +173,11 @@ class NearbyService {
       final type = map['type'] as String?;
 
       if (type == 'identity') {
-        final userId = map['userId'] as String;
-        final name = map['name'] as String? ?? 'Inconnu';
+        final userId = map['userId'] as String?;
+        if (userId == null || userId.isEmpty) return;
+        final name = (map['name'] as String?)?.trim().isNotEmpty == true
+            ? (map['name'] as String).trim()
+            : 'Inconnu';
         _connected[endpointId] = userId;
         _discovered[endpointId] = UserModel(
           id: userId,
@@ -218,12 +233,16 @@ class NearbyService {
       }
 
       if (type == 'media_meta') {
-        _pendingPayloads[map['payloadId'] as int? ?? -1] = {
+        final payloadId = map['payloadId'] as int?;
+        if (payloadId == null || payloadId < 0) return;
+        _pendingPayloads[payloadId] = {
           'endpointId': endpointId,
           'meta': map,
           'type': 'media_meta',
         };
       }
+    } on FormatException catch (e) {
+      debugPrint('Payload Nearby invalide: $e');
     } catch (e) {
       debugPrint('Erreur parsing payload: $e');
     }
@@ -302,11 +321,12 @@ class NearbyService {
     required String endpointId,
     required String conversationId,
     required String text,
+    String? messageId,
   }) async {
-    final messageId = _uuid.v4();
+    final stableMessageId = messageId ?? _uuid.v4();
     final payload = jsonEncode({
       'type': 'message',
-      'id': messageId,
+      'id': stableMessageId,
       'conversationId': conversationId,
       'senderId': StorageService.userId,
       'senderName': StorageService.userName,

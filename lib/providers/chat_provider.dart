@@ -112,6 +112,7 @@ class ChatProvider extends ChangeNotifier {
         endpointId: endpointId,
         conversationId: conversationId,
         text: text,
+        messageId: message.id,
       );
     }
     if (!success) {
