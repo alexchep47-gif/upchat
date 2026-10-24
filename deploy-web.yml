@@ -1,0 +1,55 @@
+# À placer dans le dépôt upchat-web : .github/workflows/deploy-web.yml
+name: Déployer UpChat web (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Génère web/ seulement s'il n'existe pas déjà dans le dépôt
+      - name: Préparer le projet web
+        run: |
+          if [ ! -d web ]; then
+            flutter create . --platforms web --project-name upchat
+          fi
+          flutter --version
+
+      - run: flutter pub get
+
+      # Le site est servi sur /upchat-web/ : base-href doit correspondre
+      - name: Compiler le web
+        run: flutter build web --release --base-href /upchat-web/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
