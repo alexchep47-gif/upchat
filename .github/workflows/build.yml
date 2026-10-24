@@ -50,9 +50,6 @@ jobs:
 
   build-web:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -73,20 +70,19 @@ jobs:
         run: |
           flutter create --platforms=web . --project-name upchat || true
 
-      - name: Build web app
-        run: flutter build web --release --base-href "/upchat/"
-
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload web artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Build Flutter Web for /app/
+        run: |
+          echo "Building version from pubspec:"
+          grep '^version:' pubspec.yaml
+          flutter build web --release --base-href "/app/"
+          BUILD_ID="${{ github.sha }}"
+          echo "$BUILD_ID" > build/web/.last_build_id
+          if [ -f build/web/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html || true
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html || true
+          fi
+          echo "Built version.json:"
+          cat build/web/version.json || true
 
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
@@ -94,3 +90,58 @@ jobs:
           name: upchat-web
           path: build/web
           retention-days: 30
+
+      - name: Deploy to upchat-web /app (Vercel)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -z "$GH_PAT" ]; then
+            echo "GH_PAT absent — skip deploy Vercel (artifact web disponible)"
+            exit 0
+          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf /tmp/upchat-web
+          git clone --depth 1 "https://x-access-token:${GH_PAT}@github.com/alexchep47-gif/upchat-web.git" /tmp/upchat-web
+          rm -rf /tmp/upchat-web/app
+          mkdir -p /tmp/upchat-web/app
+          cp -a build/web/. /tmp/upchat-web/app/
+          echo "${{ github.sha }}" > /tmp/upchat-web/app/.last_build_id
+          echo "${{ github.sha }}" > /tmp/upchat-web/.upchat-source-sha
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/upchat-web/app/.deployed_at
+          # Keep vercel routing healthy (do not rewrite static assets)
+          cat > /tmp/upchat-web/vercel.json << 'EOF'
+          {
+            "cleanUrls": false,
+            "trailingSlash": true,
+            "rewrites": [
+              { "source": "/", "destination": "/app/index.html" },
+              { "source": "/app", "destination": "/app/index.html" },
+              { "source": "/app/", "destination": "/app/index.html" }
+            ],
+            "headers": [
+              {
+                "source": "/(.*)",
+                "headers": [
+                  { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+                ]
+              }
+            ]
+          }
+          EOF
+          # Preserve existing landing page if present, else create redirect
+          if [ ! -f /tmp/upchat-web/index.html ] || ! grep -q "upchat\|UpChat" /tmp/upchat-web/index.html 2>/dev/null; then
+            cat > /tmp/upchat-web/index.html << 'EOF'
+          <!DOCTYPE html><html><head>
+          <meta http-equiv="refresh" content="0; url=/app/" />
+          <script>location.replace('/app/');</script>
+          </head><body><a href="/app/">UpChat</a></body></html>
+          EOF
+          fi
+          cd /tmp/upchat-web
+          git add -A
+          git status
+          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}')
+          git commit -m "Deploy UpChat ${VER} ${{ github.sha }}" || echo "Nothing to commit"
+          git push origin main
+          echo "Deployed ${VER} to upchat-web/app — Vercel auto-deploy"
