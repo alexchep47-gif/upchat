@@ -1,0 +1,10 @@
+{
+  "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version",
+  "framework": null,
+  "buildCommand": "export PATH=\"/tmp/flutter/bin:$PATH\" && flutter pub get && flutter build web --release --base-href /",
+  "outputDirectory": "build/web",
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
