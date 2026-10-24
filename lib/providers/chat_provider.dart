@@ -7,17 +7,22 @@ import '../data/models/message_model.dart';
 import '../data/services/storage_service.dart';
 import '../data/services/nearby_service.dart';
 import '../data/services/mesh_service.dart';
+import '../data/services/internet_service.dart';
+import '../data/services/phone_directory_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
   final NearbyService _nearby = NearbyService();
   final MeshService _mesh = MeshService();
+  final InternetService _internet = InternetService();
+  final PhoneDirectoryService _phoneDir = PhoneDirectoryService();
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
   final Map<String, bool> _typingUsers = {}; // userId → isTyping
 
-  List<ConversationModel> get conversations => List.unmodifiable(_conversations);
+  List<ConversationModel> get conversations =>
+      List.unmodifiable(_conversations);
   bool isTyping(String userId) => _typingUsers[userId] ?? false;
 
   List<MessageModel> messagesFor(String conversationId) {
@@ -35,13 +40,15 @@ class ChatProvider extends ChangeNotifier {
     _nearby.onConnected = (endpointId, userId) {
       _mesh.onNewConnection(endpointId, userId);
     };
+    _internet.onMessageReceived = _onIncomingMessage;
   }
 
   void _loadFromStorage() {
     for (final key in StorageService.conversations.keys) {
       final map = StorageService.conversations.get(key);
       if (map is Map) {
-        _conversations.add(ConversationModel.fromMap(Map<String, dynamic>.from(map)));
+        _conversations
+            .add(ConversationModel.fromMap(Map<String, dynamic>.from(map)));
       }
     }
     _conversations.sort((a, b) {
@@ -51,7 +58,8 @@ class ChatProvider extends ChangeNotifier {
     });
 
     for (final key in StorageService.messages.keys) {
-      if (key.toString().startsWith('relay_')) continue;
+      if (key.toString().startsWith('relay_') ||
+          key.toString().startsWith('outbox_')) continue;
       final map = StorageService.messages.get(key);
       if (map is Map) {
         try {
@@ -107,6 +115,8 @@ class ChatProvider extends ChangeNotifier {
     _addLocalMessage(message, preview: text);
 
     bool success = false;
+
+    // 1. Nearby (prioritaire en local)
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
         endpointId: endpointId,
@@ -114,6 +124,8 @@ class ChatProvider extends ChangeNotifier {
         text: text,
       );
     }
+
+    // 2. Mesh offline
     if (!success) {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
@@ -122,7 +134,20 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    _updateMessageStatus(message.id, success ? MessageStatus.sent : MessageStatus.failed);
+    // 3. Internet (mode hybride)
+    if (!success && _internet.isEnabled) {
+      final known = _phoneDir.all().where((u) => u.id == conversationId);
+      final phone = known.isNotEmpty ? known.first.phoneNumber : null;
+      success = await _internet.sendMessage(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: text,
+        targetPhone: phone,
+      );
+    }
+
+    _updateMessageStatus(
+        message.id, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
   Future<void> sendMediaMessage({
@@ -171,8 +196,21 @@ class ChatProvider extends ChangeNotifier {
         mediaPath: mediaPath,
       );
     }
+    if (!success && _internet.isEnabled) {
+      final known = _phoneDir.all().where((u) => u.id == conversationId);
+      final phone = known.isNotEmpty ? known.first.phoneNumber : null;
+      success = await _internet.sendMessage(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: preview,
+        type: type,
+        mediaPath: mediaPath,
+        targetPhone: phone,
+      );
+    }
 
-    _updateMessageStatus(message.id, success ? MessageStatus.sent : MessageStatus.failed);
+    _updateMessageStatus(
+        message.id, success ? MessageStatus.sent : MessageStatus.failed);
   }
 
   void _addLocalMessage(MessageModel message, {required String preview}) {
@@ -187,7 +225,6 @@ class ChatProvider extends ChangeNotifier {
     for (final list in _messages.values) {
       final index = list.indexWhere((m) => m.id == messageId);
       if (index != -1) {
-        // Ne pas rétrograder (read > delivered > sent)
         final current = list[index].status;
         if (_statusRank(status) >= _statusRank(current)) {
           list[index] = list[index].copyWith(status: status);
@@ -219,7 +256,8 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _onIncomingMessage(MessageModel message) {
-    if (message.content.startsWith('{') && message.content.contains('mesh_relay')) {
+    if (message.content.startsWith('{') &&
+        message.content.contains('mesh_relay')) {
       try {
         final map = jsonDecode(message.content) as Map<String, dynamic>;
         if (map['type'] == 'mesh_relay') {
@@ -229,18 +267,22 @@ class ChatProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
-    getOrCreateConversation(peerId: message.senderId, peerName: message.senderName);
+    getOrCreateConversation(
+        peerId: message.senderId, peerName: message.senderName);
 
     _messages.putIfAbsent(message.conversationId, () => []);
-    if (_messages[message.conversationId]!.any((m) => m.id == message.id)) return;
+    if (_messages[message.conversationId]!.any((m) => m.id == message.id))
+      return;
 
     _messages[message.conversationId]!.add(message);
-    _updateConversationPreview(message.conversationId, message.content, isIncoming: true);
+    _updateConversationPreview(message.conversationId, message.content,
+        isIncoming: true);
     StorageService.messages.put(message.id, message.toMap());
     notifyListeners();
   }
 
-  void _updateConversationPreview(String conversationId, String text, {bool isIncoming = false}) {
+  void _updateConversationPreview(String conversationId, String text,
+      {bool isIncoming = false}) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index == -1) return;
 
@@ -256,15 +298,14 @@ class ChatProvider extends ChangeNotifier {
     StorageService.conversations.put(conversationId, updated.toMap());
   }
 
-  /// Marque comme lu + envoie les accusés de lecture
   void markAsRead(String conversationId, {String? endpointId}) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
       _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
-      StorageService.conversations.put(conversationId, _conversations[index].toMap());
+      StorageService.conversations
+          .put(conversationId, _conversations[index].toMap());
     }
 
-    // Envoie les read receipts pour les messages reçus non lus
     final msgs = _messages[conversationId] ?? [];
     final unreadIds = msgs
         .where((m) => !m.isMe && m.status != MessageStatus.read)

@@ -17,7 +17,8 @@ class ConversationsListScreen extends StatefulWidget {
   const ConversationsListScreen({super.key});
 
   @override
-  State<ConversationsListScreen> createState() => _ConversationsListScreenState();
+  State<ConversationsListScreen> createState() =>
+      _ConversationsListScreenState();
 }
 
 class _ConversationsListScreenState extends State<ConversationsListScreen> {
@@ -47,6 +48,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             title: const Text('UpChat'),
             actions: [
               IconButton(
+                icon: const Icon(Icons.person_add_alt_1_rounded),
+                tooltip: 'Contact par numéro',
+                onPressed: () =>
+                    Navigator.pushNamed(context, AppRouter.addContactByPhone),
+              ),
+              IconButton(
                 icon: const Icon(Icons.search_rounded),
                 onPressed: () {},
               ),
@@ -65,6 +72,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) {
                   switch (value) {
+                    case 'phone':
+                      Navigator.pushNamed(
+                          context, AppRouter.addContactByPhone);
+                      break;
                     case 'group':
                       Navigator.pushNamed(context, AppRouter.createGroup);
                       break;
@@ -77,9 +88,15 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                   }
                 },
                 itemBuilder: (_) => [
-                  const PopupMenuItem(value: 'story', child: Text('📖 Nouvelle story')),
-                  const PopupMenuItem(value: 'group', child: Text('👥 Nouveau groupe')),
-                  const PopupMenuItem(value: 'settings', child: Text('⚙️ Réglages')),
+                  const PopupMenuItem(
+                      value: 'phone',
+                      child: Text('📱 Contact par numéro')),
+                  const PopupMenuItem(
+                      value: 'story', child: Text('📖 Nouvelle story')),
+                  const PopupMenuItem(
+                      value: 'group', child: Text('👥 Nouveau groupe')),
+                  const PopupMenuItem(
+                      value: 'settings', child: Text('⚙️ Réglages')),
                 ],
               ),
             ],
@@ -94,7 +111,8 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
                       color: (connectivity.isHybridReady
                               ? Colors.blue
@@ -145,15 +163,18 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
           const SliverToBoxAdapter(child: StoriesBar()),
 
           if (chat.conversations.isEmpty && nearby.nearbyDevices.isEmpty)
-            const SliverFillRemaining(
+            const // ignore: prefer_const_constructors
+                SliverFillRemaining(
               child: EmptyState(
                 icon: Icons.chat_bubble_outline_rounded,
                 title: 'Aucune discussion 💬',
                 subtitle:
-                    'Approche-toi d\'autres téléphones UpChat\nou active le mode internet dans Réglages.',
+                    'Approche-toi d\'autres téléphones UpChat\nou ajoute un contact par numéro (mode internet).',
               ),
             )
           else
+            // ignore: prefer_const_constructors
+            // ignore: prefer_const_constructors
             SliverList(
               delegate: SliverChildListDelegate([
                 if (nearby.nearbyDevices.isNotEmpty) ...[
@@ -174,11 +195,12 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                       title: device.name,
                       subtitle: '🟢 En ligne · à proximité',
                       onTap: () {
-                        final conv = context.read<ChatProvider>().getOrCreateConversation(
-                              peerId: device.id,
-                              peerName: device.name,
-                              endpointId: device.endpointId,
-                            );
+                        final conv =
+                            context.read<ChatProvider>().getOrCreateConversation(
+                                  peerId: device.id,
+                                  peerName: device.name,
+                                  endpointId: device.endpointId,
+                                );
                         Navigator.pushNamed(
                           context,
                           AppRouter.chat,
