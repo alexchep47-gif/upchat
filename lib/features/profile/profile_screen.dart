@@ -18,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
+  late TextEditingController _phoneController;
   late TextEditingController _bioController;
   bool _pickingPhoto = false;
 
@@ -26,12 +27,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     final profile = context.read<ProfileProvider>();
     _nameController = TextEditingController(text: profile.name);
+    _phoneController = TextEditingController(text: profile.phoneNumber ?? '');
     _bioController = TextEditingController(text: profile.bio ?? '');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -128,6 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(
             onPressed: () async {
               await profile.updateName(_nameController.text);
+              await profile.updatePhone(_phoneController.text);
               await profile.updateBio(_bioController.text);
               if (mounted) Navigator.pop(context);
             },
@@ -200,6 +204,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             decoration: const InputDecoration(
               labelText: 'Nom',
               prefixIcon: Icon(Icons.person),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Numéro de téléphone',
+              hintText: '+237 6 00 00 00 00',
+              prefixIcon: Icon(Icons.phone_outlined),
             ),
           ),
           const SizedBox(height: 16),

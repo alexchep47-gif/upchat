@@ -64,6 +64,12 @@ class StorageService {
   static String get userName =>
       _settingsBox.get(AppConstants.keyUserName, defaultValue: 'Utilisateur') as String;
 
+  static String? get userPhone => _settingsBox.get(AppConstants.keyUserPhone) as String?;
+
+  static Future<void> setUserPhone(String? phone) async {
+    await _settingsBox.put(AppConstants.keyUserPhone, phone);
+  }
+
   static Future<void> setUserName(String name) async {
     await _settingsBox.put(AppConstants.keyUserName, name);
   }

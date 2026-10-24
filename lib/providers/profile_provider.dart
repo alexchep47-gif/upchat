@@ -2,14 +2,17 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../data/services/storage_service.dart';
+import '../data/models/user_model.dart';
 
 /// Gère le profil de l'utilisateur local
 class ProfileProvider extends ChangeNotifier {
   String _name = 'Utilisateur';
+  String? _phoneNumber;
   String? _bio;
   String? _photoPath;
 
   String get name => _name;
+  String? get phoneNumber => _phoneNumber;
   String? get bio => _bio;
   String? get photoPath => _photoPath;
   String get userId => StorageService.userId;
@@ -20,6 +23,7 @@ class ProfileProvider extends ChangeNotifier {
 
   void _load() {
     _name = StorageService.userName;
+    _phoneNumber = StorageService.userPhone;
     _bio = StorageService.userBio;
     final path = StorageService.userPhotoPath;
     // Vérifie que le fichier existe encore (Android)
@@ -41,6 +45,26 @@ class ProfileProvider extends ChangeNotifier {
     _name = newName.trim().isEmpty ? 'Utilisateur' : newName.trim();
     await StorageService.setUserName(_name);
     notifyListeners();
+  }
+
+  Future<void> updatePhone(String? newPhone) async {
+    final normalized = newPhone == null ? null : UserModel.normalizePhone(newPhone);
+    _phoneNumber = normalized == '' ? null : normalized;
+    await StorageService.setUserPhone(_phoneNumber);
+    _syncDirectoryRecord();
+    notifyListeners();
+  }
+
+  void _syncDirectoryRecord() {
+    if (_phoneNumber == null) return;
+    final user = UserModel(
+      id: userId,
+      name: _name,
+      phoneNumber: _phoneNumber,
+      bio: _bio,
+      photoPath: _photoPath,
+    );
+    StorageService.users.put(user.id, user.toMap());
   }
 
   Future<void> updateBio(String? newBio) async {

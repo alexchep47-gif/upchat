@@ -39,6 +39,7 @@ class AppConstants {
   // Clés de stockage
   static const String keyUserId = 'user_id';
   static const String keyUserName = 'user_name';
+  static const String keyUserPhone = 'user_phone';
   static const String keyUserBio = 'user_bio';
   static const String keyUserPhoto = 'user_photo';
   static const String keyThemeMode = 'theme_mode';

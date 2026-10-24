@@ -12,6 +12,7 @@ import '../../providers/profile_provider.dart';
 import '../../features/stories/stories_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/profile_avatar.dart';
+import 'phone_contact_dialog.dart';
 
 class ConversationsListScreen extends StatefulWidget {
   const ConversationsListScreen({super.key});
@@ -48,7 +49,11 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
             actions: [
               IconButton(
                 icon: const Icon(Icons.search_rounded),
-                onPressed: () {},
+                tooltip: 'Écrire à un numéro',
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const PhoneContactDialog(),
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 8),
