@@ -31,13 +31,9 @@ jobs:
 
       - name: Ensure Android platform files
         run: |
-          flutter create --platforms=android,web . --project-name upchat || true
-          git checkout -- android/app/src/main/AndroidManifest.xml || true
-          git checkout -- android/app/build.gradle || true
-          git checkout -- android/build.gradle || true
-          git checkout -- android/settings.gradle || true
-          git checkout -- android/gradle/wrapper/gradle-wrapper.properties || true
-          git checkout -- android/app/src/main/kotlin/com/upchat/app/MainActivity.kt || true
+          if [ ! -f android/settings.gradle ] || [ ! -f android/app/build.gradle ]; then
+            flutter create --platforms=android . --project-name upchat
+          fi
 
       - name: Build APK (arm64)
         run: flutter build apk --release --target-platform android-arm64 --split-per-abi
@@ -69,8 +65,9 @@ jobs:
 
       - name: Ensure Web platform files
         run: |
-          flutter create --platforms=web . --project-name upchat || true
-          git checkout -- web/index.html web/manifest.json || true
+          if [ ! -f web/index.html ] || [ ! -f web/manifest.json ]; then
+            flutter create --platforms=web . --project-name upchat
+          fi
 
       - name: Build Flutter Web for Vercel (/app/)
         run: |
@@ -78,8 +75,8 @@ jobs:
           BUILD_ID="${{ github.sha }}"
           echo "$BUILD_ID" > build/web/.last_build_id
           if [ -f build/web/index.html ]; then
-            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html || true
-            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html || true
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html
           fi
 
       - name: Upload web build artifact
@@ -106,7 +103,6 @@ jobs:
           mkdir -p /tmp/upchat-web/app
           cp -a build/web/. /tmp/upchat-web/app/
           echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
-          echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/.upchat-source-sha
           date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/upchat-web/app/.deployed_at
@@ -150,9 +146,9 @@ jobs:
           echo "$BUILD_ID" > build/web-pages/.last_build_id
           date -u +"%Y-%m-%dT%H:%M:%SZ" > build/web-pages/.deployed_at
           if [ -f build/web-pages/index.html ]; then
-            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
-            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
-            sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n</head>|' build/web-pages/index.html || true
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html
+            sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n</head>|' build/web-pages/index.html
           fi
           echo "$BUILD_ID" > build/web-pages/.last_build_id
 

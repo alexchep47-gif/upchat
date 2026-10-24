@@ -22,8 +22,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglu1-mesa \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Flutter SDK
-RUN git clone https://github.com/flutter/flutter.git -b stable /flutter
+# Install the same Flutter SDK version used by CI.
+RUN git clone --depth 1 --branch 3.24.5 https://github.com/flutter/flutter.git /flutter
 RUN flutter config --no-analytics
 
 # Install Android SDK command-line tools and API level packages
@@ -32,7 +32,7 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     unzip -q /tmp/cmdline-tools.zip -d /tmp && \
     mv /tmp/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
     yes | sdkmanager --licenses && \
-    sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "platforms;android-33" "build-tools;33.0.0"
+    sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" "platforms;android-34" "build-tools;34.0.0"
 
 # Copy project files
 COPY . .

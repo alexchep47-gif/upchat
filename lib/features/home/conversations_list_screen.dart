@@ -229,6 +229,7 @@ class SliiverEmpty extends StatelessWidget {
                 ),
               ),
             ),
+          ],
         ),
       ),
     );

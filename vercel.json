@@ -1,8 +1,8 @@
 {
-  "buildCommand": "export PATH=\"/tmp/flutter/bin:$PATH\" && if [ ! -d /tmp/flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 /tmp/flutter; fi && cd /tmp && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version && cd /workspace && flutter pub get && flutter build web --release --base-href / && BUILD_ID=\"${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse --short HEAD)}\" && if [ -f build/web/index.html ]; then sed -i \"s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g\" build/web/index.html || true; sed -i \"s|flutter.js|flutter.js?v=${BUILD_ID}|g\" build/web/index.html || true; fi",
+  "buildCommand": "export PATH=\"/tmp/flutter/bin:$PATH\" && if [ ! -d /tmp/flutter ]; then git clone https://github.com/flutter/flutter.git -b 3.24.5 --depth 1 /tmp/flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version && flutter pub get && flutter build web --release --base-href / && BUILD_ID=\"${VERCEL_GIT_COMMIT_SHA:-$(git rev-parse --short HEAD)}\" && if [ -f build/web/index.html ]; then sed -i \"s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g\" build/web/index.html; sed -i \"s|flutter.js|flutter.js?v=${BUILD_ID}|g\" build/web/index.html; fi",
   "outputDirectory": "build/web",
   "framework": null,
-  "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b stable --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version",
+  "installCommand": "cd /tmp && if [ ! -d flutter ]; then git clone https://github.com/flutter/flutter.git -b 3.24.5 --depth 1 flutter; fi && export PATH=\"/tmp/flutter/bin:$PATH\" && flutter --version",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
