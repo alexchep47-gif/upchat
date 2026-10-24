@@ -32,15 +32,12 @@ jobs:
       - name: Ensure Android platform files
         run: |
           flutter create --platforms=android,web . --project-name upchat || true
-          # Restaure nos configs custom (ne pas écraser Gradle 8.7 ni le manifest)
           git checkout -- android/app/src/main/AndroidManifest.xml || true
           git checkout -- android/app/build.gradle || true
           git checkout -- android/build.gradle || true
           git checkout -- android/settings.gradle || true
           git checkout -- android/gradle/wrapper/gradle-wrapper.properties || true
           git checkout -- android/app/src/main/kotlin/com/upchat/app/MainActivity.kt || true
-          echo "Gradle wrapper:"
-          cat android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build APK (arm64)
         run: flutter build apk --release --target-platform android-arm64 --split-per-abi
@@ -73,13 +70,10 @@ jobs:
       - name: Ensure Web platform files
         run: |
           flutter create --platforms=web . --project-name upchat || true
-          # Conserve notre index.html / manifest si présents
           git checkout -- web/index.html web/manifest.json || true
 
-      - name: Build Flutter Web for /app/
+      - name: Build Flutter Web for Vercel (/app/)
         run: |
-          echo "Building version from pubspec:"
-          grep '^version:' pubspec.yaml
           flutter build web --release --base-href "/app/"
           BUILD_ID="${{ github.sha }}"
           echo "$BUILD_ID" > build/web/.last_build_id
@@ -87,8 +81,6 @@ jobs:
             sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html || true
             sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html || true
           fi
-          echo "Built version.json:"
-          cat build/web/version.json || true
 
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
@@ -102,7 +94,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           if [ -z "$GH_PAT" ]; then
-            echo "GH_PAT absent — skip deploy Vercel (artifact web disponible)"
+            echo "GH_PAT absent — skip deploy Vercel"
             exit 0
           fi
           git config --global user.name "github-actions[bot]"
@@ -144,8 +136,38 @@ jobs:
           fi
           cd /tmp/upchat-web
           git add -A
-          git status
           VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}')
           git commit -m "Deploy UpChat ${VER} ${{ github.sha }}" || echo "Nothing to commit"
           git push origin main
-          echo "Deployed ${VER} to upchat-web/app — Vercel auto-deploy"
+
+      - name: Build Flutter Web for GitHub Pages (/upchat/)
+        run: |
+          flutter build web --release --base-href "/upchat/" -o build/web-pages
+          BUILD_ID="${{ github.sha }}"
+          echo "$BUILD_ID" > build/web-pages/.last_build_id
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > build/web-pages/.deployed_at
+          if [ -f build/web-pages/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html || true
+            # No-cache meta to avoid stale SW/cache
+            sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n</head>|' build/web-pages/index.html || true
+          fi
+
+      - name: Deploy to GitHub Pages (branche gh-pages)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          rm -rf /tmp/upchat-pages
+          mkdir -p /tmp/upchat-pages
+          cp -a build/web-pages/. /tmp/upchat-pages/
+          cd /tmp/upchat-pages
+          git init
+          git checkout -b gh-pages
+          git add -A
+          git commit -m "GitHub Pages UpChat ${{ github.sha }}"
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
+          git push -f origin gh-pages
+          echo "Publié sur https://alexchep47-gif.github.io/upchat/"
