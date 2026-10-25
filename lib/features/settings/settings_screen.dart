@@ -123,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: const Text('Appareils connectés'),
                 subtitle: const Text('Gérer les sessions et les appareils autorisés'),
                 trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () => _showInfo('Appareils connectés', 'La gestion des appareils sera liée au même compte UpChat dès que la session internet est active.'),
+                onTap: () => Navigator.pushNamed(context, AppRouter.connectedDevices),
               ),
             ]),
             _section('Confidentialité', Icons.lock_outline_rounded, [

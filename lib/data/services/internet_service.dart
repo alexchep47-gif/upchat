@@ -215,6 +215,16 @@ class InternetService {
     if (!requireRegisteredAccount && local != null) return local;
 
     if (!_isOnline || !_isConnectedToSignaling) {
+      if (_enabled) {
+        await _connectSignaling();
+        if (_isConnectedToSignaling) {
+          _isOnline = true;
+          _startHeartbeat();
+          _startInboxPolling();
+        }
+      }
+    }
+    if (!_isOnline || !_isConnectedToSignaling) {
       if (requireRegisteredAccount) {
         throw StateError('Le serveur UpChat est indisponible pour vérifier ce numéro.');
       }
@@ -239,6 +249,11 @@ class InternetService {
           );
           await _directory.upsert(user);
           return user;
+        }
+      } else if (res.statusCode == 401) {
+        await _connectSignaling();
+        if (_isConnectedToSignaling) {
+          return lookupByPhone(phone, requireRegisteredAccount: requireRegisteredAccount);
         }
       } else if (res.statusCode >= 500) {
         throw StateError('Le serveur UpChat est temporairement indisponible.');

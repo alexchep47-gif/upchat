@@ -20,7 +20,8 @@ android {
 
     defaultConfig {
         applicationId = "com.upchat.app"
-        minSdk = 23
+        // Android 9 (API 28) is the supported compatibility floor.
+        minSdk = 28
         targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
