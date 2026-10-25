@@ -2,7 +2,7 @@ name: Publish GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [gh-pages]
   workflow_dispatch:
 
 permissions:
@@ -24,7 +24,7 @@ jobs:
       - name: Checkout the configured Pages artifact
         uses: actions/checkout@v4
         with:
-          ref: v0/cleanup-android-readme
+          ref: gh-pages
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

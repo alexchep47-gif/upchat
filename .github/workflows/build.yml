@@ -187,16 +187,13 @@ jobs:
           rm -rf /tmp/upchat-pages
           mkdir -p /tmp/upchat-pages
           cp -a build/web-pages/. /tmp/upchat-pages/
+          mkdir -p /tmp/upchat-pages/downloads
+          cp build/universal/app-release.apk /tmp/upchat-pages/downloads/UpChat-1.3.1-5-universal.apk
+          sha256sum build/universal/app-release.apk | awk '{print $1 "  UpChat-1.3.1-5-universal.apk"}' > /tmp/upchat-pages/downloads/UpChat-1.3.1-5-universal.apk.sha256
           echo "$BUILD_ID" > /tmp/upchat-pages/.last_build_id
           cd /tmp/upchat-pages
           git init
           git checkout -b gh-pages
-          cat > index.html << EOF
-          <!DOCTYPE html><html><head>
-          <meta http-equiv="refresh" content="0; url=/upchat/?v=${BUILD_ID}" />
-          <script>location.replace('/upchat/?v=${BUILD_ID}');</script>
-          </head><body><a href="/upchat/?v=${BUILD_ID}">UpChat</a></body></html>
-          EOF
           git add -A
           git commit -m "GitHub Pages UpChat ${{ github.sha }}"
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
