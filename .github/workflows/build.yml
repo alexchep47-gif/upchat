@@ -123,7 +123,10 @@ jobs:
           cp -a build/web/. /tmp/upchat-web/app/
           mkdir -p /tmp/upchat-web/downloads
           cp build/universal/app-release.apk /tmp/upchat-web/downloads/UpChat-universal.apk
+          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}' | tr '+' '-')
+          cp build/universal/app-release.apk "/tmp/upchat-web/downloads/UpChat-${VER}-universal.apk"
           printf '%s\n' "$BUILD_ID" > /tmp/upchat-web/downloads/UpChat-universal.apk.sha
+          sha256sum build/universal/app-release.apk | awk '{print $1}' > "/tmp/upchat-web/downloads/UpChat-${VER}-universal.apk.sha256"
           echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/.upchat-source-sha
