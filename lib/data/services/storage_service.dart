@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -23,24 +24,38 @@ class StorageService {
 
   /// Initialisation au démarrage de l'app
   static Future<void> init() async {
+    // flutter_secure_storage peut attendre indéfiniment dans certains
+    // navigateurs. Le Web utilise une boîte Hive locale pour conserver la
+    // clé de chiffrement, tandis qu'Android/iOS gardent le stockage natif.
+    if (kIsWeb) {
+      _settingsBox = await Hive.openBox('settings');
+    }
+
     // Récupère ou génère la clé de chiffrement
-    String? encryptionKey =
-        await _secureStorage.read(key: AppConstants.keyEncryptionKey);
+    String? encryptionKey = kIsWeb
+        ? _settingsBox.get(AppConstants.keyEncryptionKey) as String?
+        : await _secureStorage.read(key: AppConstants.keyEncryptionKey);
 
     if (encryptionKey == null) {
       // Première installation → génère une clé AES 256 bits
       final key = base64Url.encode(
         List<int>.generate(32, (_) => Random.secure().nextInt(256)),
       );
-      await _secureStorage.write(
-          key: AppConstants.keyEncryptionKey, value: key);
+      if (kIsWeb) {
+        await _settingsBox.put(AppConstants.keyEncryptionKey, key);
+      } else {
+        await _secureStorage.write(
+            key: AppConstants.keyEncryptionKey, value: key);
+      }
       encryptionKey = key;
     }
 
     final keyBytes = base64Url.decode(encryptionKey);
 
     // Ouvre les boîtes Hive (chiffrées pour les données sensibles)
-    _settingsBox = await Hive.openBox('settings');
+    if (!kIsWeb) {
+      _settingsBox = await Hive.openBox('settings');
+    }
     _secureSettingsBox = await Hive.openBox(
       AppConstants.secureSettingsBox,
       encryptionCipher: HiveAesCipher(keyBytes),
