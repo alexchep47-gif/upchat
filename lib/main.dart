@@ -16,6 +16,7 @@ import 'providers/nearby_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/stories_provider.dart';
 import 'providers/connectivity_provider.dart';
+import 'providers/settings_provider.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -228,14 +229,30 @@ class UpChatApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => StoriesProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
+        ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
+          final settings = context.watch<SettingsProvider>();
+          final lightTheme = AppTheme.lightTheme.copyWith(
+            appBarTheme: AppTheme.lightTheme.appBarTheme.copyWith(
+              backgroundColor: settings.transparentToolbar
+                  ? Colors.transparent
+                  : AppTheme.lightTheme.colorScheme.surface,
+            ),
+          );
+          final darkTheme = AppTheme.darkTheme.copyWith(
+            appBarTheme: AppTheme.darkTheme.appBarTheme.copyWith(
+              backgroundColor: settings.transparentToolbar
+                  ? Colors.transparent
+                  : AppTheme.darkTheme.colorScheme.surface,
+            ),
+          );
           return MaterialApp(
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: lightTheme,
+            darkTheme: darkTheme,
             themeMode: themeProvider.themeMode,
             builder: (context, child) {
               final overlayStyle =

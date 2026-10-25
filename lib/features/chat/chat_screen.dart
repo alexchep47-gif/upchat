@@ -11,6 +11,7 @@ import '../../core/utils/media_helper.dart';
 import '../../data/models/message_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/nearby_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/empty_state.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -84,7 +85,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final endpointId = _resolveEndpointId();
     if (endpointId == null) return;
 
-    if (_controller.text.isNotEmpty && !_sentTyping) {
+    if (context.read<SettingsProvider>().typingIndicators &&
+        _controller.text.isNotEmpty &&
+        !_sentTyping) {
       context.read<ChatProvider>().sendTyping(endpointId, true);
       _sentTyping = true;
     }
@@ -296,6 +299,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chat = context.watch<ChatProvider>();
+    final settings = context.watch<SettingsProvider>();
     final messages = chat.messagesFor(widget.conversationId);
     final visibleMessages = _searchQuery.trim().isEmpty
         ? messages
@@ -557,8 +561,11 @@ class _ChatScreenState extends State<ChatScreen> {
                               controller: _controller,
                               maxLines: null,
                               textCapitalization: TextCapitalization.sentences,
+                              textInputAction: settings.enterToSend
+                                  ? TextInputAction.send
+                                  : TextInputAction.newline,
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 16 * settings.chatFontScale,
                                 color: isDark
                                     ? AppColors.textPrimaryDark
                                     : AppColors.textPrimaryLight,
@@ -571,7 +578,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                   vertical: 10,
                                 ),
                               ),
-                              onSubmitted: (_) => _sendMessage(),
+                              onSubmitted: settings.enterToSend
+                                  ? (_) => _sendMessage()
+                                  : null,
                             ),
                           ),
                         ),

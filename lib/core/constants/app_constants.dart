@@ -50,6 +50,18 @@ class AppConstants {
   static const String keyAutoCleanup = 'auto_cleanup';
   static const String keyAutoPlayStories = 'auto_play_stories';
   static const String keyStoryViewDuration = 'story_view_duration';
+  static const String keyReadReceipts = 'settings_read_receipts';
+  static const String keyOnlineStatus = 'settings_online_status';
+  static const String keyTypingIndicators = 'settings_typing_indicators';
+  static const String keyNotificationSounds = 'settings_notification_sounds';
+  static const String keyNotificationVibration = 'settings_notification_vibration';
+  static const String keyNotificationPreview = 'settings_notification_preview';
+  static const String keyEnterToSend = 'settings_enter_to_send';
+  static const String keyAutoDownloadMedia = 'settings_auto_download_media';
+  static const String keySaveToGallery = 'settings_save_to_gallery';
+  static const String keyLowDataMode = 'settings_low_data_mode';
+  static const String keyTransparentToolbar = 'settings_transparent_toolbar';
+  static const String keyChatFontScale = 'settings_chat_font_scale';
 
   // Stockage local sensible
   static const String secureSettingsBox = 'secure_settings';

@@ -86,7 +86,7 @@ class AppTheme {
       canvasColor: background,
       visualDensity: VisualDensity.adaptivePlatformDensity,
       appBarTheme: AppBarTheme(
-        backgroundColor: surface,
+        backgroundColor: Colors.transparent,
         foregroundColor: primaryText,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -99,6 +99,7 @@ class AppTheme {
           fontWeight: FontWeight.w700,
           letterSpacing: -0.3,
         ),
+        shadowColor: Colors.transparent,
       ),
       textTheme: _textTheme(primaryText, secondaryText),
       dividerTheme: DividerThemeData(color: divider, space: 1, thickness: 1),
