@@ -58,6 +58,7 @@ jobs:
           retention-days: 30
 
   build-web:
+    needs: build-apk
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
