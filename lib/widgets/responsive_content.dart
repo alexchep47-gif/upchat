@@ -11,17 +11,6 @@ class ResponsiveContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return Align(
-          alignment: Alignment.topCenter,
-          child: SizedBox(
-            width: constraints.maxWidth,
-            height: constraints.maxHeight,
-            child: child,
-          ),
-        );
-      },
-    );
+    return SizedBox.expand(child: child);
   }
 }

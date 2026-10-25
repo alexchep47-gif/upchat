@@ -21,8 +21,11 @@ RUN git clone --depth 1 --branch 3.24.5 https://github.com/flutter/flutter.git /
 COPY . .
 
 RUN flutter config --no-analytics
-RUN flutter pub get
-RUN flutter build web --release --base-href "/app/"
+# Render ne construit que la version Web : ne laissons pas Flutter initialiser
+# Gradle/Android dans son environnement de build rootless.
+RUN mv android /tmp/android && \
+    flutter pub get && \
+    flutter build web --release --base-href "/app/"
 
 FROM nginx:1.27-alpine
 COPY --from=build /src/build/web /usr/share/nginx/html
