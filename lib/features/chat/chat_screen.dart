@@ -565,7 +565,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                   ? TextInputAction.send
                                   : TextInputAction.newline,
                               style: TextStyle(
-                                fontSize: 16 * settings.chatFontScale,
+                                fontSize: 16,
                                 color: isDark
                                     ? AppColors.textPrimaryDark
                                     : AppColors.textPrimaryLight,

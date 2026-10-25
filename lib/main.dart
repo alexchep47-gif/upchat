@@ -25,7 +25,7 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const AppBootstrap());
 }
 
@@ -271,12 +271,18 @@ class UpChatApp extends StatelessWidget {
               final overlayStyle =
                   Theme.of(context).appBarTheme.systemOverlayStyle ??
                       SystemUiOverlayStyle.dark;
+              final mediaQuery = MediaQuery.of(context);
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: overlayStyle,
-                child: ColoredBox(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  child: SizedBox.expand(
-                    child: child ?? const SizedBox.shrink(),
+                child: MediaQuery(
+                  data: mediaQuery.copyWith(
+                    textScaler: TextScaler.linear(settings.chatFontScale),
+                  ),
+                  child: ColoredBox(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    child: SizedBox.expand(
+                      child: child ?? const SizedBox.shrink(),
+                    ),
                   ),
                 ),
               );

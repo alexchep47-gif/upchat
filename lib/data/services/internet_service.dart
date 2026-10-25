@@ -215,13 +215,13 @@ class InternetService {
     if (!requireRegisteredAccount && local != null) return local;
 
     if (!_isOnline || !_isConnectedToSignaling) {
-      if (_enabled) {
-        await _connectSignaling();
-        if (_isConnectedToSignaling) {
-          _isOnline = true;
-          _startHeartbeat();
-          _startInboxPolling();
-        }
+      // Phone verification is an explicit online action. It must not depend
+      // on the optional background relay toggle being enabled beforehand.
+      await _connectSignaling();
+      if (_isConnectedToSignaling) {
+        _isOnline = true;
+        _startHeartbeat();
+        if (_enabled) _startInboxPolling();
       }
     }
     if (!_isOnline || !_isConnectedToSignaling) {

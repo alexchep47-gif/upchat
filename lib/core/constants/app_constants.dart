@@ -1,7 +1,7 @@
 /// Constantes globales de l'application UpChat
 class AppConstants {
   static const String appName = 'UpChat';
-  static const String appVersion = '1.3.0';
+  static const String appVersion = '1.3.1';
   static const String appTagline = 'Messagerie 100 % offline';
 
   // Auteur

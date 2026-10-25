@@ -9,13 +9,13 @@ class AppColors {
   static const Color teal = Color(0xFF128C7E);
 
   // Bulles
-  static const Color bubbleMe = Color(0xFFE1FFC7);
+  static const Color bubbleMe = Color(0xFFDFF3FF);
   static const Color bubbleMeDark = Color(0xFF2B5278);
   static const Color bubbleOther = Color(0xFFFFFFFF);
   static const Color bubbleOtherDark = Color(0xFF182533);
 
   // Fonds
-  static const Color backgroundLight = Color(0xFFF4F7FA);
+  static const Color backgroundLight = Color(0xFFFFFFFF);
   static const Color backgroundDark = Color(0xFF0E1621);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color surfaceDark = Color(0xFF17212B);

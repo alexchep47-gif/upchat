@@ -75,10 +75,10 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light.copyWith(
         statusBarColor: Colors.transparent,
-        systemNavigationBarColor: AppColors.backgroundDark,
+        systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
       ),
       child: Scaffold(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -140,7 +140,7 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
                 ),
               ),
               Container(
-                color: AppColors.backgroundDark,
+                color: Theme.of(context).scaffoldBackgroundColor,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 760),
@@ -182,8 +182,8 @@ class _HomeHeader extends StatelessWidget {
           OutlinedButton(
             onPressed: onProfile,
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.textPrimaryDark,
-              side: BorderSide(color: Colors.white.withOpacity(0.18)),
+              foregroundColor: Theme.of(context).colorScheme.onSurface,
+              side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.18)),
               padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
@@ -191,12 +191,12 @@ class _HomeHeader extends StatelessWidget {
             ),
             child: const Text('Modifier'),
           ),
-          const Expanded(
+          Expanded(
             child: Center(
               child: Text(
                 'Échanges',
                 style: TextStyle(
-                  color: AppColors.textPrimaryDark,
+                  color: Theme.of(context).colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.4,
@@ -239,9 +239,9 @@ class _HeaderIconButton extends StatelessWidget {
       child: IconButton(
         onPressed: onPressed,
         icon: Icon(icon, size: 25),
-        color: AppColors.textPrimaryDark,
+        color: Theme.of(context).colorScheme.onSurface,
         style: IconButton.styleFrom(
-          side: BorderSide(color: Colors.white.withOpacity(0.18)),
+          side: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.18)),
           shape: const CircleBorder(),
           padding: const EdgeInsets.all(11),
         ),
@@ -278,9 +278,9 @@ class _ConversationTabs extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.16)),
         borderRadius: BorderRadius.circular(28),
-        color: Colors.white.withOpacity(0.025),
+        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.025),
       ),
       child: Row(
         children: [
@@ -293,7 +293,7 @@ class _ConversationTabs extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     color: selectedIndex == i
-                        ? Colors.white.withOpacity(0.14)
+                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.14)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(23),
                   ),
@@ -305,7 +305,7 @@ class _ConversationTabs extends StatelessWidget {
                           tabs[i].label,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: AppColors.textPrimaryDark,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontSize: 14,
                             fontWeight: selectedIndex == i
                                 ? FontWeight.w700
@@ -393,9 +393,9 @@ class _InfoBanner extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       padding: const EdgeInsets.fromLTRB(16, 13, 12, 13),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.14)),
         borderRadius: BorderRadius.circular(18),
-        color: AppColors.surfaceDark,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
       ),
       child: Row(
         children: [
@@ -414,7 +414,7 @@ class _InfoBanner extends StatelessWidget {
                 Text(
                   title,
                   style: const TextStyle(
-                    color: AppColors.textPrimaryDark,
+                    color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
@@ -423,7 +423,7 @@ class _InfoBanner extends StatelessWidget {
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    color: AppColors.textSecondaryDark,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
                 ),
@@ -440,7 +440,7 @@ class _InfoBanner extends StatelessWidget {
                 ? AppColors.online
                 : internetEnabled
                     ? AppColors.primary
-                    : AppColors.textSecondaryDark,
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
             size: 21,
           ),
         ],
@@ -530,7 +530,7 @@ class _ConversationSliver extends StatelessWidget {
         child: Center(
           child: Text(
             'Aucune discussion dans cette catégorie',
-            style: TextStyle(color: AppColors.textSecondaryDark),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
         ),
       );
@@ -574,7 +574,7 @@ class _ConversationTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.09)),
+              bottom: BorderSide(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.09)),
             ),
           ),
           child: Row(
@@ -598,7 +598,7 @@ class _ConversationTile extends StatelessWidget {
                           color: AppColors.online,
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: AppColors.backgroundDark,
+                            color: Theme.of(context).scaffoldBackgroundColor,
                             width: 2,
                           ),
                         ),
@@ -618,8 +618,8 @@ class _ConversationTile extends StatelessWidget {
                             title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textPrimaryDark,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontSize: 17,
                               fontWeight: FontWeight.w700,
                             ),
@@ -631,7 +631,7 @@ class _ConversationTile extends StatelessWidget {
                             style: TextStyle(
                               color: unread > 0
                                   ? AppColors.primary
-                                  : AppColors.textSecondaryDark,
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                               fontWeight: unread > 0
                                   ? FontWeight.w700
@@ -644,9 +644,9 @@ class _ConversationTile extends StatelessWidget {
                     Row(
                       children: [
                         if (isGroup) ...[
-                          const Icon(
+                          Icon(
                             Icons.group_outlined,
-                            color: AppColors.textSecondaryDark,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                             size: 15,
                           ),
                           const SizedBox(width: 4),
@@ -656,8 +656,8 @@ class _ConversationTile extends StatelessWidget {
                             subtitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textSecondaryDark,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 14,
                             ),
                           ),
@@ -748,7 +748,7 @@ class _BottomNavigation extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xE62A2A2A),
           borderRadius: BorderRadius.circular(34),
-          border: Border.all(color: Colors.white.withOpacity(0.14)),
+          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.14)),
           boxShadow: const [
             BoxShadow(
               color: Colors.black45,
@@ -796,7 +796,7 @@ class _BottomNavigationItem extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
         decoration: BoxDecoration(
-          color: selected ? Colors.white.withOpacity(0.10) : Colors.transparent,
+          color: selected ? Theme.of(context).colorScheme.onSurface.withOpacity(0.10) : Colors.transparent,
           borderRadius: BorderRadius.circular(27),
         ),
         child: Column(
@@ -807,7 +807,7 @@ class _BottomNavigationItem extends StatelessWidget {
               size: 24,
               color: selected
                   ? AppColors.primary
-                  : AppColors.textPrimaryDark,
+                  : Theme.of(context).colorScheme.onSurface,
             ),
             const SizedBox(height: 3),
             Text(
@@ -817,7 +817,7 @@ class _BottomNavigationItem extends StatelessWidget {
               style: TextStyle(
                 color: selected
                     ? AppColors.primary
-                    : AppColors.textPrimaryDark,
+                    : Theme.of(context).colorScheme.onSurface,
                 fontSize: 11,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),

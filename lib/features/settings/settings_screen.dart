@@ -84,12 +84,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAbout() {
-    showAboutDialog(
+    showDialog<void>(
       context: context,
-      applicationName: AppConstants.appName,
-      applicationVersion: AppConstants.appVersion,
-      applicationLegalese: AppConstants.authorCredit,
-      children: const [Text('Messagerie privée hybride : Nearby, Wi-Fi Direct, Mesh et relais internet optionnel.')],
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundColor: AppColors.primary.withOpacity(.14),
+              child: const Icon(Icons.chat_rounded, color: AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            const Text(AppConstants.appName),
+          ],
+        ),
+        content: Text(
+          'Version ${AppConstants.appVersion}\n\n'
+          'Messagerie privée hybride : proximité, Wi‑Fi Direct, réseau maillé et relais internet optionnel.\n\n'
+          '${AppConstants.authorCredit}',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Fermer')),
+        ],
+      ),
     );
   }
 
