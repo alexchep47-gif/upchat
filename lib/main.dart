@@ -31,13 +31,7 @@ void main() {
 }
 
 Future<void> _initializeApp() async {
-  if (kIsWeb) {
-    // Hive.initFlutter() relies on the platform path provider and can remain
-    // pending in browsers. Hive's Web backend does not need a filesystem path.
-    Hive.init('upchat_web');
-  } else {
-    await Hive.initFlutter();
-  }
+  await Hive.initFlutter();
   await StorageService.init();
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
