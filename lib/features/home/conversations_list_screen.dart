@@ -352,7 +352,7 @@ class _CountBadge extends StatelessWidget {
       child: Text(
         '$value',
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        style: TextStyle(
           color: Colors.white,
           fontSize: 12,
           fontWeight: FontWeight.w700,
@@ -413,7 +413,7 @@ class _InfoBanner extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurface,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
@@ -422,7 +422,7 @@ class _InfoBanner extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                   ),
@@ -525,7 +525,7 @@ class _ConversationSliver extends StatelessWidget {
     }
 
     if (entries.isEmpty) {
-      return const SliverFillRemaining(
+      return SliverFillRemaining(
         hasScrollBody: false,
         child: Center(
           child: Text(
