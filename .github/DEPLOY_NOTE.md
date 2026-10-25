@@ -1,8 +1,10 @@
 # Deploy
 
 - **APK** : artifact `upchat-apk` (workflow Build Android and Web)
-- **Web (GitHub Pages)** : désactivé dans le job actuel (focus Vercel)
-- **Web (Vercel https://upchat-web.vercel.app/app/)** : nécessite le secret `GH_PAT` sur le repo `upchat` pour pousser dans `upchat-web` sous `/app`
+- **Web (GitHub Pages)** : https://alexchep47-gif.github.io/upchat/
+- **Web (Vercel public)** : https://upchat-web-pi.vercel.app/app/
+- **Vercel (équipe CMR SCHOOL)** : le domaine public stable est `upchat-web-pi.vercel.app`; les domaines `*-cmr-school.vercel.app` restent protégés par l’authentification Vercel.
+- Le workflow pousse le build dans `upchat-web` sous `/app`; le secret `GH_PAT` doit être configuré sur le repo `upchat`.
 
 ## Secret GH_PAT
 
