@@ -136,7 +136,11 @@ class _AddContactByPhoneScreenState extends State<AddContactByPhoneScreen> {
       if (mounted) {
         setState(() {
           _loading = false;
-          _error = 'Erreur : $e';
+          _error = e is StateError
+              ? e.message
+              : 'Impossible de vérifier ce numéro pour le moment.';
+          _info =
+              'Vérifie ta connexion Internet et assure-toi que le serveur UpChat est disponible.';
         });
       }
     }

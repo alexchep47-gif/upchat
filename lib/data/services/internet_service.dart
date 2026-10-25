@@ -214,7 +214,12 @@ class InternetService {
     final local = _directory.findLocal(phone);
     if (!requireRegisteredAccount && local != null) return local;
 
-    if (!_isOnline) return null;
+    if (!_isOnline || !_isConnectedToSignaling) {
+      if (requireRegisteredAccount) {
+        throw StateError('Le serveur UpChat est indisponible pour vérifier ce numéro.');
+      }
+      return null;
+    }
 
     try {
       final res = await http
@@ -235,6 +240,8 @@ class InternetService {
           await _directory.upsert(user);
           return user;
         }
+      } else if (res.statusCode >= 500) {
+        throw StateError('Le serveur UpChat est temporairement indisponible.');
       }
     } catch (e) {
       debugPrint('InternetService: lookup error: $e');

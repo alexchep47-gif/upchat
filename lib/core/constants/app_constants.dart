@@ -23,7 +23,7 @@ class AppConstants {
   // Signalisation mode internet (Vercel)
   // Remplace par ton URL de déploiement upchat-signal si différente
   static const String signalingBaseUrl =
-      'https://upchat-signal.vercel.app';
+      'https://upchat-signal-cmr-school.vercel.app';
 
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);

@@ -21,7 +21,12 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: AppColors.primary,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: AppColors.surfaceLight,
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
         titleTextStyle: TextStyle(
           color: AppColors.textPrimaryLight,
           fontSize: 20,
@@ -73,7 +78,12 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: AppColors.primary,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: AppColors.backgroundDark,
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
         titleTextStyle: TextStyle(
           color: AppColors.textPrimaryDark,
           fontSize: 20,
