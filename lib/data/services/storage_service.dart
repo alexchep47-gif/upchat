@@ -51,6 +51,7 @@ class StorageService {
     }
 
     final keyBytes = base64Url.decode(encryptionKey);
+    final HiveCipher? webSafeCipher = kIsWeb ? null : HiveAesCipher(keyBytes);
 
     // Ouvre les boîtes Hive (chiffrées pour les données sensibles)
     if (!kIsWeb) {
@@ -58,21 +59,18 @@ class StorageService {
     }
     _secureSettingsBox = await Hive.openBox(
       AppConstants.secureSettingsBox,
-      encryptionCipher: HiveAesCipher(keyBytes),
+      encryptionCipher: webSafeCipher,
     );
     await _migrateSensitiveSettings();
-    _usersBox =
-        await Hive.openBox('users', encryptionCipher: HiveAesCipher(keyBytes));
+    _usersBox = await Hive.openBox('users', encryptionCipher: webSafeCipher);
     _conversationsBox = await Hive.openBox('conversations',
-        encryptionCipher: HiveAesCipher(keyBytes));
-    _messagesBox = await Hive.openBox('messages',
-        encryptionCipher: HiveAesCipher(keyBytes));
-    _groupsBox =
-        await Hive.openBox('groups', encryptionCipher: HiveAesCipher(keyBytes));
-    _storiesBox = await Hive.openBox('stories',
-        encryptionCipher: HiveAesCipher(keyBytes));
+        encryptionCipher: webSafeCipher);
+    _messagesBox =
+        await Hive.openBox('messages', encryptionCipher: webSafeCipher);
+    _groupsBox = await Hive.openBox('groups', encryptionCipher: webSafeCipher);
+    _storiesBox = await Hive.openBox('stories', encryptionCipher: webSafeCipher);
     _phoneDirectoryBox = await Hive.openBox('phone_directory',
-        encryptionCipher: HiveAesCipher(keyBytes));
+        encryptionCipher: webSafeCipher);
 
     // Crée un ID utilisateur local s'il n'existe pas
     if (_secureSettingsBox.get(AppConstants.keyUserId) == null) {
