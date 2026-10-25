@@ -48,26 +48,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: upchat-apk
-          path: build/app/outputs/flutter-apk/*.apk
+          path: build/app/outputs/flutter-apk/app-*.apk
           retention-days: 30
-
-      - name: Publish universal APK to the responsive site
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          if [ -z "$GH_PAT" ]; then
-            echo "GH_PAT absent — skip site APK publication"
-            exit 0
-          fi
-          rm -rf /tmp/upchat-web-download
-          git clone --depth 1 "https://x-access-token:${GH_PAT}@github.com/alexchep47-gif/upchat-web.git" /tmp/upchat-web-download
-          mkdir -p /tmp/upchat-web-download/downloads
-          cp build/app/outputs/flutter-apk/app-release.apk /tmp/upchat-web-download/downloads/UpChat-universal.apk
-          printf '%s\n' "${{ github.sha }}" > /tmp/upchat-web-download/downloads/UpChat-universal.apk.sha
-          cd /tmp/upchat-web-download
-          git add downloads
-          git commit -m "Publish universal UpChat Android build ${{ github.sha }}" || echo "No APK change"
-          git push origin main
+      - name: Upload universal APK for the website job
+        uses: actions/upload-artifact@v4
+        with:
+          name: upchat-apk-universal
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
 
   build-web:
     runs-on: ubuntu-latest
@@ -110,6 +98,12 @@ jobs:
           path: build/web
           retention-days: 30
 
+      - name: Download universal APK for the website
+        uses: actions/download-artifact@v4
+        with:
+          name: upchat-apk-universal
+          path: build/universal
+
       - name: Deploy to upchat-web /app (Vercel)
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
@@ -126,6 +120,9 @@ jobs:
           rm -rf /tmp/upchat-web/app
           mkdir -p /tmp/upchat-web/app
           cp -a build/web/. /tmp/upchat-web/app/
+          mkdir -p /tmp/upchat-web/downloads
+          cp build/universal/app-release.apk /tmp/upchat-web/downloads/UpChat-universal.apk
+          printf '%s\n' "$BUILD_ID" > /tmp/upchat-web/downloads/UpChat-universal.apk.sha
           echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
           echo "$BUILD_ID" > /tmp/upchat-web/.upchat-source-sha
