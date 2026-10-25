@@ -22,13 +22,15 @@ class StorageService {
   static late Box _storiesBox;
   static late Box _phoneDirectoryBox;
 
+  static String _boxName(String name) => kIsWeb ? '${name}_web' : name;
+
   /// Initialisation au démarrage de l'app
   static Future<void> init() async {
     // flutter_secure_storage peut attendre indéfiniment dans certains
     // navigateurs. Le Web utilise une boîte Hive locale pour conserver la
     // clé de chiffrement, tandis qu'Android/iOS gardent le stockage natif.
     if (kIsWeb) {
-      _settingsBox = await Hive.openBox('settings');
+      _settingsBox = await Hive.openBox(_boxName('settings'));
     }
 
     // Récupère ou génère la clé de chiffrement
@@ -55,21 +57,21 @@ class StorageService {
 
     // Ouvre les boîtes Hive (chiffrées pour les données sensibles)
     if (!kIsWeb) {
-      _settingsBox = await Hive.openBox('settings');
+      _settingsBox = await Hive.openBox(_boxName('settings'));
     }
     _secureSettingsBox = await Hive.openBox(
-      AppConstants.secureSettingsBox,
+      _boxName(AppConstants.secureSettingsBox),
       encryptionCipher: webSafeCipher,
     );
     await _migrateSensitiveSettings();
-    _usersBox = await Hive.openBox('users', encryptionCipher: webSafeCipher);
-    _conversationsBox = await Hive.openBox('conversations',
+    _usersBox = await Hive.openBox(_boxName('users'), encryptionCipher: webSafeCipher);
+    _conversationsBox = await Hive.openBox(_boxName('conversations'),
         encryptionCipher: webSafeCipher);
     _messagesBox =
-        await Hive.openBox('messages', encryptionCipher: webSafeCipher);
-    _groupsBox = await Hive.openBox('groups', encryptionCipher: webSafeCipher);
-    _storiesBox = await Hive.openBox('stories', encryptionCipher: webSafeCipher);
-    _phoneDirectoryBox = await Hive.openBox('phone_directory',
+        await Hive.openBox(_boxName('messages'), encryptionCipher: webSafeCipher);
+    _groupsBox = await Hive.openBox(_boxName('groups'), encryptionCipher: webSafeCipher);
+    _storiesBox = await Hive.openBox(_boxName('stories'), encryptionCipher: webSafeCipher);
+    _phoneDirectoryBox = await Hive.openBox(_boxName('phone_directory'),
         encryptionCipher: webSafeCipher);
 
     // Crée un ID utilisateur local s'il n'existe pas
