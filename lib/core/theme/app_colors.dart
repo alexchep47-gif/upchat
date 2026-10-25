@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 class AppColors {
   static const Color primary = Color(0xFF2AABEE); // bleu Telegram accent
   static const Color primaryDark = Color(0xFF229ED9);
-  static const Color accent = Color(0xFF25D366); // vert de validation
+  // Blue is the single UI accent; green is reserved for presence/success.
+  static const Color accent = Color(0xFF2AABEE);
   static const Color teal = Color(0xFF128C7E);
 
   // Bulles
@@ -14,7 +15,7 @@ class AppColors {
   static const Color bubbleOtherDark = Color(0xFF182533);
 
   // Fonds
-  static const Color backgroundLight = Color(0xFFE6DDC8); // papier chat clair
+  static const Color backgroundLight = Color(0xFFF4F7FA);
   static const Color backgroundDark = Color(0xFF0E1621);
   static const Color surfaceLight = Color(0xFFFFFFFF);
   static const Color surfaceDark = Color(0xFF17212B);

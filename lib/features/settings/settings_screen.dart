@@ -62,7 +62,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-        ...children,
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: children),
+        ),
+        const SizedBox(height: 4),
       ],
     );
   }
@@ -110,6 +115,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.only(top: kToolbarHeight + 12, bottom: 32),
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: () => Navigator.pushNamed(context, AppRouter.profile),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: AppColors.primary.withOpacity(.14),
+                          child: const Icon(Icons.person_rounded, color: AppColors.primary, size: 30),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(StorageService.userName.isEmpty ? 'Mon profil' : StorageService.userName, style: Theme.of(context).textTheme.titleMedium),
+                              const SizedBox(height: 3),
+                              Text(StorageService.userPhone ?? 'Ajouter un numéro de téléphone', style: Theme.of(context).textTheme.bodySmall),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
             _section('Compte', Icons.person_outline_rounded, [
               ListTile(
                 leading: const Icon(Icons.account_circle_outlined),

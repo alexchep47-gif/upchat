@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_colors.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
 import 'data/services/storage_service.dart';
@@ -81,7 +82,7 @@ class _StartupScreen extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.backgroundDark,
         body: SafeArea(
           child: Stack(
             fit: StackFit.expand,
@@ -120,6 +121,18 @@ class _StartupScreen extends StatelessWidget {
                         color: Colors.white.withOpacity(0.42),
                         fontSize: 13,
                         letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: 116,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: const LinearProgressIndicator(
+                          minHeight: 3,
+                          backgroundColor: Color(0x332AABEE),
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -174,7 +187,7 @@ class _StartupError extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.backgroundDark,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),

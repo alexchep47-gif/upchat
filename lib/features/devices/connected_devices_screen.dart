@@ -13,10 +13,41 @@ class ConnectedDevicesScreen extends StatelessWidget {
     final connectivity = context.watch<ConnectivityProvider>();
     final devices = nearby.nearbyDevices;
     return Scaffold(
-      appBar: AppBar(title: const Text('Appareils connectés')),
+      appBar: AppBar(
+        title: const Text('Appareils connectés'),
+        actions: [
+          IconButton(
+            tooltip: 'Actualiser la découverte',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: nearby.start,
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: [
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(18),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: AppColors.primary.withOpacity(.14),
+                    child: const Icon(Icons.devices_rounded, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      'Gérez les sessions actives et les appareils UpChat à proximité.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           _StatusCard(
             icon: connectivity.isOnline ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
             title: connectivity.isOnline ? 'Relais internet actif' : 'Relais internet inactif',
