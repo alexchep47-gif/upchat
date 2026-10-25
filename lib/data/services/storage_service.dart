@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:uuid/uuid.dart';
@@ -12,6 +13,7 @@ class StorageService {
   );
 
   static late Box _settingsBox;
+  static late Box _secureSettingsBox;
   static late Box _usersBox;
   static late Box _conversationsBox;
   static late Box _messagesBox;
@@ -27,8 +29,9 @@ class StorageService {
 
     if (encryptionKey == null) {
       // Première installation → génère une clé AES 256 bits
-      final key = base64Url.encode(List<int>.generate(
-          32, (i) => DateTime.now().microsecondsSinceEpoch % 256 + i));
+      final key = base64Url.encode(
+        List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+      );
       await _secureStorage.write(
           key: AppConstants.keyEncryptionKey, value: key);
       encryptionKey = key;
@@ -38,6 +41,11 @@ class StorageService {
 
     // Ouvre les boîtes Hive (chiffrées pour les données sensibles)
     _settingsBox = await Hive.openBox('settings');
+    _secureSettingsBox = await Hive.openBox(
+      AppConstants.secureSettingsBox,
+      encryptionCipher: HiveAesCipher(keyBytes),
+    );
+    await _migrateSensitiveSettings();
     _usersBox =
         await Hive.openBox('users', encryptionCipher: HiveAesCipher(keyBytes));
     _conversationsBox = await Hive.openBox('conversations',
@@ -52,9 +60,25 @@ class StorageService {
         encryptionCipher: HiveAesCipher(keyBytes));
 
     // Crée un ID utilisateur local s'il n'existe pas
-    if (_settingsBox.get(AppConstants.keyUserId) == null) {
+    if (_secureSettingsBox.get(AppConstants.keyUserId) == null) {
       final userId = const Uuid().v4();
-      await _settingsBox.put(AppConstants.keyUserId, userId);
+      await _secureSettingsBox.put(AppConstants.keyUserId, userId);
+    }
+  }
+
+  static Future<void> _migrateSensitiveSettings() async {
+    const sensitiveKeys = [
+      AppConstants.keyUserId,
+      AppConstants.keyUserName,
+      AppConstants.keyUserBio,
+      AppConstants.keyUserPhoto,
+      AppConstants.keyUserPhone,
+    ];
+    for (final key in sensitiveKeys) {
+      if (_secureSettingsBox.containsKey(key)) continue;
+      if (!_settingsBox.containsKey(key)) continue;
+      await _secureSettingsBox.put(key, _settingsBox.get(key));
+      await _settingsBox.delete(key);
     }
   }
 
@@ -69,37 +93,38 @@ class StorageService {
 
   // ─── Helpers settings ─────────────────────────────────────
   static String get userId =>
-      _settingsBox.get(AppConstants.keyUserId) as String;
+      _secureSettingsBox.get(AppConstants.keyUserId) as String;
 
   static String get userName =>
-      _settingsBox.get(AppConstants.keyUserName, defaultValue: 'Utilisateur')
+      _secureSettingsBox
+          .get(AppConstants.keyUserName, defaultValue: 'Utilisateur')
           as String;
 
   static Future<void> setUserName(String name) async {
-    await _settingsBox.put(AppConstants.keyUserName, name);
+    await _secureSettingsBox.put(AppConstants.keyUserName, name);
   }
 
   static String? get userBio =>
-      _settingsBox.get(AppConstants.keyUserBio) as String?;
+      _secureSettingsBox.get(AppConstants.keyUserBio) as String?;
 
   static Future<void> setUserBio(String? bio) async {
-    await _settingsBox.put(AppConstants.keyUserBio, bio);
+    await _secureSettingsBox.put(AppConstants.keyUserBio, bio);
   }
 
   static String? get userPhotoPath =>
-      _settingsBox.get(AppConstants.keyUserPhoto) as String?;
+      _secureSettingsBox.get(AppConstants.keyUserPhoto) as String?;
 
   static Future<void> setUserPhotoPath(String? path) async {
-    await _settingsBox.put(AppConstants.keyUserPhoto, path);
+    await _secureSettingsBox.put(AppConstants.keyUserPhoto, path);
   }
 
   /// Numéro de téléphone (digits, sans espaces) — utilisé pour le mode internet
   static String? get userPhone =>
-      _settingsBox.get(AppConstants.keyUserPhone) as String?;
+      _secureSettingsBox.get(AppConstants.keyUserPhone) as String?;
 
   static Future<void> setUserPhone(String? phone) async {
     final normalized = phone == null ? null : normalizePhone(phone);
-    await _settingsBox.put(AppConstants.keyUserPhone, normalized);
+    await _secureSettingsBox.put(AppConstants.keyUserPhone, normalized);
   }
 
   /// Normalise un numéro : ne garde que les chiffres et le + initial

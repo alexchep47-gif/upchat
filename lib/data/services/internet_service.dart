@@ -126,8 +126,7 @@ class InternetService {
         _onlinePeers[StorageService.userId] = DateTime.now();
         debugPrint('InternetService: enregistré sur signalisation');
       } else {
-        debugPrint(
-            'InternetService: register HTTP ${res.statusCode} ${res.body}');
+        debugPrint('InternetService: register HTTP ${res.statusCode}');
         _isConnectedToSignaling = false;
       }
     } catch (e) {
@@ -222,12 +221,17 @@ class InternetService {
       if (targetPhone != null) 'targetPhone': targetPhone,
       'messageType': type.name,
       'content': text,
-      'mediaPath': mediaPath,
+      // Un chemin local n'est jamais transmissible au serveur. Les médias
+      // distants devront utiliser un mediaId/URL chiffré dans une prochaine
+      // étape du backend.
+      if (mediaPath != null &&
+          (mediaPath.startsWith('https://') || mediaPath.startsWith('http://')))
+        'mediaPath': mediaPath,
       'createdAt': DateTime.now().toIso8601String(),
     };
 
     if (!_isOnline || !_isConnectedToSignaling) {
-      _queuePayload(payload);
+      await _queuePayload(payload);
       debugPrint("InternetService: message mis en file d'attente (hors ligne)");
       return false;
     }
@@ -246,26 +250,25 @@ class InternetService {
           .timeout(const Duration(seconds: 12));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        debugPrint(
-            'InternetService: transmission → ${payload['targetUserId']}');
+        debugPrint('InternetService: transmission réussie');
         return true;
       }
       debugPrint('InternetService: transmit HTTP ${res.statusCode}');
-      _queuePayload(payload);
+      await _queuePayload(payload);
       return false;
     } catch (e) {
       debugPrint('InternetService: échec transmission: $e');
-      _queuePayload(payload);
+      await _queuePayload(payload);
       return false;
     }
   }
 
-  void _queuePayload(Map<String, dynamic> payload) {
+  Future<void> _queuePayload(Map<String, dynamic> payload) async {
     final id = payload['id'];
     if (!_outbox.any((item) => item['id'] == id)) {
       _outbox.add(payload);
     }
-    StorageService.messages.put('outbox_$id', payload);
+    await StorageService.messages.put('outbox_$id', payload);
   }
 
   Future<void> _flushOutbox() async {

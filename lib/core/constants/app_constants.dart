@@ -50,4 +50,7 @@ class AppConstants {
   static const String keyAutoCleanup = 'auto_cleanup';
   static const String keyAutoPlayStories = 'auto_play_stories';
   static const String keyStoryViewDuration = 'story_view_duration';
+
+  // Stockage local sensible
+  static const String secureSettingsBox = 'secure_settings';
 }
