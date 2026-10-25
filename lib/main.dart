@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -30,7 +31,13 @@ void main() {
 }
 
 Future<void> _initializeApp() async {
-  await Hive.initFlutter();
+  if (kIsWeb) {
+    // Hive.initFlutter() relies on the platform path provider and can remain
+    // pending in browsers. Hive's Web backend does not need a filesystem path.
+    Hive.init('upchat_web');
+  } else {
+    await Hive.initFlutter();
+  }
   await StorageService.init();
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
