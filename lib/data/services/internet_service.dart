@@ -30,6 +30,9 @@ class InternetService {
   bool _isOnline = false;
   bool _isConnectedToSignaling = false;
   Timer? _heartbeatTimer;
+  Timer? _inboxTimer;
+  bool _flushInProgress = false;
+  bool _inboxPullInProgress = false;
 
   // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
@@ -94,6 +97,7 @@ class InternetService {
       onConnectivityChanged?.call(true);
       await _flushOutbox();
       _startHeartbeat();
+      _startInboxPolling();
     } else {
       onConnectivityChanged?.call(false);
     }
@@ -102,6 +106,8 @@ class InternetService {
   Future<void> _stop() async {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = null;
+    _inboxTimer?.cancel();
+    _inboxTimer = null;
     _isOnline = false;
     _isConnectedToSignaling = false;
     _onlinePeers.clear();
@@ -159,6 +165,41 @@ class InternetService {
             .timeout(const Duration(seconds: 8));
       } catch (_) {}
     });
+  }
+
+  void _startInboxPolling() {
+    _inboxTimer?.cancel();
+    _inboxTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      _pullInbox();
+    });
+    _pullInbox();
+  }
+
+  Future<void> _pullInbox() async {
+    if (_inboxPullInProgress || !_enabled || !_isOnline || !_isConnectedToSignaling) {
+      return;
+    }
+    _inboxPullInProgress = true;
+    try {
+      final res = await http
+          .get(_uri('/api/inbox', {'limit': '100'}), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode == 401) {
+        _isConnectedToSignaling = false;
+        return;
+      }
+      if (res.statusCode != 200) return;
+      final decoded = jsonDecode(res.body);
+      final rawMessages = decoded is Map<String, dynamic> ? decoded['messages'] : null;
+      if (rawMessages is! List) return;
+      for (final raw in rawMessages) {
+        if (raw is Map) handleIncoming(Map<String, dynamic>.from(raw));
+      }
+    } catch (error) {
+      debugPrint('InternetService: inbox error: $error');
+    } finally {
+      _inboxPullInProgress = false;
+    }
   }
 
   /// Recherche un utilisateur par numéro de téléphone (réseau + cache local)
@@ -261,6 +302,10 @@ class InternetService {
         return true;
       }
       debugPrint('InternetService: transmit HTTP ${res.statusCode}');
+      if (res.statusCode >= 400 && res.statusCode < 500 &&
+          res.statusCode != 408 && res.statusCode != 425 && res.statusCode != 429) {
+        return false;
+      }
       await _queuePayload(payload);
       return false;
     } catch (e) {
@@ -279,16 +324,20 @@ class InternetService {
   }
 
   Future<void> _flushOutbox() async {
-    if (_outbox.isEmpty) return;
+    if (_flushInProgress || _outbox.isEmpty) return;
+    _flushInProgress = true;
+    try {
+      final pending = List<Map<String, dynamic>>.from(_outbox);
+      _outbox.clear();
 
-    final pending = List<Map<String, dynamic>>.from(_outbox);
-    _outbox.clear();
-
-    for (final payload in pending) {
-      final ok = await _transmit(payload);
-      if (ok) {
-        await StorageService.messages.delete('outbox_${payload['id']}');
+      for (final payload in pending) {
+        final ok = await _transmit(payload);
+        if (ok) {
+          await StorageService.messages.delete('outbox_${payload['id']}');
+        }
       }
+    } finally {
+      _flushInProgress = false;
     }
   }
 
@@ -302,8 +351,11 @@ class InternetService {
       await _connectSignaling();
       await _flushOutbox();
       _startHeartbeat();
+      _startInboxPolling();
     } else if (!online) {
       _heartbeatTimer?.cancel();
+      _inboxTimer?.cancel();
+      _inboxTimer = null;
       _isConnectedToSignaling = false;
     }
   }
@@ -313,11 +365,16 @@ class InternetService {
     final message = MessageModel(
       id: map['id'] as String? ?? _uuid.v4(),
       conversationId:
-          map['conversationId'] as String? ?? map['senderId'] as String? ?? '',
-      senderId: map['senderId'] as String? ?? '',
+          map['conversationId'] as String? ??
+          map['senderId'] as String? ??
+          map['senderUserId'] as String? ??
+          '',
+      senderId: map['senderId'] as String? ??
+          map['senderUserId'] as String? ??
+          '',
       senderName: map['senderName'] as String? ?? 'Inconnu',
       type: MessageType.values.firstWhere(
-        (e) => e.name == map['messageType'],
+        (e) => e.name == (map['messageType'] ?? map['type']),
         orElse: () => MessageType.text,
       ),
       content: map['content'] as String? ?? '',
