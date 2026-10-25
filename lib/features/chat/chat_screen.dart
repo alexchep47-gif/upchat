@@ -37,6 +37,7 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _sentTyping = false;
   bool _searching = false;
   String _searchQuery = '';
+  bool _showQuickActions = true;
 
   // Emojis rapides style Telegram
   static const _quickEmojis = ['👍', '❤️', '🔥', '😂', '😮', '😢', '👏', '🎉'];
@@ -227,6 +228,59 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _showQuickAction(_ChatAction action) async {
+    if (action.id == 'media') {
+      _pickAndSendMedia();
+      return;
+    }
+    if (action.id == 'clear') {
+      await _clearMessages();
+      return;
+    }
+    if (action.id == 'search') {
+      _startSearch();
+      return;
+    }
+
+    final details = <String, String>{
+      'stats': 'Messages locaux : ${context.read<ChatProvider>().messagesFor(widget.conversationId).length}\n\nLes statistiques restent disponibles hors connexion.',
+      'tokens': 'UpChat ne consomme aucun token IA pour la messagerie locale. Les échanges passent par les canaux disponibles.',
+      'memory': 'Les fichiers et médias reçus sont conservés dans l’espace local sécurisé de cette conversation.',
+      'download': 'Le téléchargement de fichiers sera proposé ici dès qu’un fichier est partagé dans cette conversation.',
+      'generate': 'Cette action prépare l’interface pour les assistants et bots qui pourront être branchés à UpChat.',
+      'editor': 'L’éditeur en ligne est prêt à accueillir un module de code partagé dans la conversation.',
+      'system': 'Canal : ${_resolveEndpointId() == null ? 'hors connexion' : 'appareil connecté'}\nChiffrement local : activé',
+      'zip': 'La préparation du fichier source est disponible depuis le dépôt du projet. Aucun fichier n’est envoyé automatiquement.',
+    };
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(22, 4, 22, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${action.icon}  ${action.title}', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 12),
+              Text(details[action.id] ?? action.subtitle, style: Theme.of(context).textTheme.bodyLarge),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(sheetContext),
+                  child: const Text('Fermer'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _handleMenu(String value) {
     switch (value) {
       case 'info':
@@ -365,8 +419,8 @@ class _ChatScreenState extends State<ChatScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDark
-                ? [AppColors.backgroundDark, const Color(0xFF15202B)]
-                : [const Color(0xFFE8F0E3), const Color(0xFFD4E5C8)],
+                ? [const Color(0xFF0B0B10), const Color(0xFF1B1520)]
+                : [const Color(0xFFF0E8F3), const Color(0xFFE1D8E7)],
           ),
         ),
         child: LayoutBuilder(
@@ -380,24 +434,36 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Column(
                   children: [
             Expanded(
-              child: visibleMessages.isEmpty
-                  ? const EmptyState(
-                      icon: Icons.lock_outline_rounded,
-                      title: 'Conversation sécurisée 🔒',
-                      subtitle:
-                          'Les messages restent sur cet appareil.\nIls partent dès que le contact est à portée.',
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
-                      itemCount: visibleMessages.length,
-                      itemBuilder: (context, index) {
-                        return _TelegramBubble(
-                          message: visibleMessages[index],
-                          isDark: isDark,
-                        );
-                      },
-                    ),
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+                itemCount: (_showQuickActions ? 1 : 0) +
+                    (visibleMessages.isEmpty ? 1 : visibleMessages.length),
+                itemBuilder: (context, index) {
+                  if (_showQuickActions && index == 0) {
+                    return _QuickActionsPanel(
+                      isDark: isDark,
+                      onAction: _showQuickAction,
+                    );
+                  }
+                  final messageIndex = index - (_showQuickActions ? 1 : 0);
+                  if (visibleMessages.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 36),
+                      child: EmptyState(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Conversation sécurisée 🔒',
+                        subtitle:
+                            'Les messages restent sur cet appareil.\nIls partent dès que le contact est à portée.',
+                      ),
+                    );
+                  }
+                  return _TelegramBubble(
+                    message: visibleMessages[messageIndex],
+                    isDark: isDark,
+                  );
+                },
+              ),
             ),
 
             // Barre d'emojis rapides
@@ -457,6 +523,19 @@ class _ChatScreenState extends State<ChatScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         IconButton(
+                          tooltip: 'Actions rapides',
+                          icon: Icon(
+                            Icons.bolt_rounded,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          onPressed: () => setState(
+                            () => _showQuickActions = !_showQuickActions,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Joindre un média',
                           icon: Icon(
                             Icons.attach_file_rounded,
                             color: isDark
@@ -550,6 +629,124 @@ class _ChatScreenState extends State<ChatScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ChatAction {
+  final String id;
+  final String icon;
+  final String title;
+  final String subtitle;
+
+  const _ChatAction(this.id, this.icon, this.title, this.subtitle);
+}
+
+class _QuickActionsPanel extends StatelessWidget {
+  final bool isDark;
+  final ValueChanged<_ChatAction> onAction;
+
+  const _QuickActionsPanel({required this.isDark, required this.onAction});
+
+  static const actions = [
+    _ChatAction('stats', '📊', 'Statistiques', 'Voir l’activité'),
+    _ChatAction('tokens', '⚡', 'Usage IA', 'Consommation'),
+    _ChatAction('memory', '📁', 'Fichiers mémoire', 'Documents partagés'),
+    _ChatAction('download', '📦', 'Télécharger', 'Fichiers reçus'),
+    _ChatAction('generate', '📄', 'Tester génération', 'Assistant'),
+    _ChatAction('editor', '🛠️', 'Éditeur en ligne', 'Code partagé'),
+    _ChatAction('system', '🛡️', 'Configuration système', 'État du canal'),
+    _ChatAction('zip', '🗜️', 'Préparer un ZIP', 'Source du projet'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final panel = isDark ? const Color(0xB52D2332) : const Color(0xD9FFFFFF);
+    final tile = isDark ? const Color(0xCC3A2F3F) : const Color(0xE6FFFFFF);
+    final foreground = isDark ? Colors.white : const Color(0xFF241C2B);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(2, 8, 2, 10),
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withOpacity(isDark ? .08 : .55)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isDark ? .24 : .08),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+            child: Row(
+              children: [
+                Text(
+                  'Actions rapides',
+                  style: TextStyle(
+                    color: foreground,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  'appuyer pour ouvrir',
+                  style: TextStyle(color: foreground.withOpacity(.58), fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: actions.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 5,
+              mainAxisSpacing: 5,
+              childAspectRatio: 3.25,
+            ),
+            itemBuilder: (context, index) {
+              final action = actions[index];
+              return Material(
+                color: tile,
+                borderRadius: BorderRadius.circular(13),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(13),
+                  onTap: () => onAction(action),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Text(action.icon, style: const TextStyle(fontSize: 17)),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            action.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: foreground,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
