@@ -21,6 +21,7 @@ RUN git clone --depth 1 --branch 3.24.5 https://github.com/flutter/flutter.git /
 COPY . .
 
 RUN flutter config --no-analytics
+RUN flutter precache --web
 # Render ne construit que la version Web : utilisons pub directement pour ne
 # pas initialiser Gradle/Android dans son environnement de build rootless.
 RUN mv android /tmp/android && \
