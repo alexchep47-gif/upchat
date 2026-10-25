@@ -4,8 +4,8 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Simple chat bubble placeholder -->
+    <!-- Monogramme U UpChat -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M30,30h48c4.4,0 8,3.6 8,8v28c0,4.4 -3.6,8 -8,8H50l-12,12v-12H30c-4.4,0 -8,-3.6 -8,-8V38c0,-4.4 3.6,-8 8,-8z"/>
+        android:pathData="M24,20h16v38c0,10 5,15 14,15s14,-5 14,-15V20h16v39c0,20 -12,31 -30,31S24,79 24,59z" />
 </vector>

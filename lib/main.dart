@@ -141,11 +141,6 @@ class _StartupLogo extends StatelessWidget {
       height: 116,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF2AABEE), Color(0xFF1769AA)],
-        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF2AABEE).withOpacity(0.28),
@@ -154,59 +149,16 @@ class _StartupLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 76,
-            height: 58,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.96),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: CustomPaint(painter: _BubbleTailPainter()),
-          ),
-          const Positioned(
-            right: 27,
-            bottom: 27,
-            child: Icon(
-              Icons.bolt_rounded,
-              color: Color(0xFF2AABEE),
-              size: 30,
-            ),
-          ),
-          Positioned(
-            top: 27,
-            left: 28,
-            child: Container(
-              width: 28,
-              height: 5,
-              decoration: BoxDecoration(
-                color: const Color(0xFF2AABEE),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ],
+      child: ClipOval(
+        child: Image.asset(
+          'assets/upchat_u_icon.png',
+          width: 116,
+          height: 116,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }
-}
-
-class _BubbleTailPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.96);
-    final path = Path()
-      ..moveTo(16, size.height - 3)
-      ..lineTo(4, size.height + 15)
-      ..lineTo(28, size.height - 6)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _StartupError extends StatelessWidget {

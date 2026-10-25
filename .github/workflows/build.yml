@@ -29,6 +29,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Generate UpChat U app icon
+        run: dart run flutter_launcher_icons
+
       - name: Ensure Android platform files
         run: |
           if [ ! -f android/settings.gradle ] || [ ! -f android/app/build.gradle ]; then
