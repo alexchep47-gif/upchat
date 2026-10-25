@@ -51,6 +51,12 @@ class InternetService {
     return Uri.parse('$base$path').replace(queryParameters: query);
   }
 
+  Map<String, String> get _headers => {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ${StorageService.deviceSecret}',
+        'X-UpChat-Client': AppConstants.appVersion,
+      };
+
   /// Active / désactive le mode internet
   Future<void> setEnabled(bool value) async {
     _enabled = value;
@@ -110,13 +116,14 @@ class InternetService {
       final body = {
         'userId': StorageService.userId,
         'name': StorageService.userName,
+        'deviceSecret': StorageService.deviceSecret,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       };
 
       final res = await http
           .post(
             _uri('/api/register'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
             body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 12));
@@ -143,7 +150,7 @@ class InternetService {
         await http
             .post(
               _uri('/api/presence'),
-              headers: {'Content-Type': 'application/json'},
+              headers: _headers,
               body: jsonEncode({
                 'userId': StorageService.userId,
                 'phone': StorageService.userPhone,
@@ -170,7 +177,7 @@ class InternetService {
 
     try {
       final res = await http
-          .get(_uri('/api/lookup', {'phone': phone}))
+          .get(_uri('/api/lookup', {'phone': phone}), headers: _headers)
           .timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 200) {
@@ -244,7 +251,7 @@ class InternetService {
       final res = await http
           .post(
             _uri('/api/message'),
-            headers: {'Content-Type': 'application/json'},
+            headers: _headers,
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 12));

@@ -64,6 +64,15 @@ class StorageService {
       final userId = const Uuid().v4();
       await _secureSettingsBox.put(AppConstants.keyUserId, userId);
     }
+    if (_secureSettingsBox.get(AppConstants.keyDeviceSecret) == null) {
+      final deviceSecret = base64Url.encode(
+        List<int>.generate(32, (_) => Random.secure().nextInt(256)),
+      );
+      await _secureSettingsBox.put(
+        AppConstants.keyDeviceSecret,
+        deviceSecret,
+      );
+    }
   }
 
   static Future<void> _migrateSensitiveSettings() async {
@@ -94,6 +103,9 @@ class StorageService {
   // ─── Helpers settings ─────────────────────────────────────
   static String get userId =>
       _secureSettingsBox.get(AppConstants.keyUserId) as String;
+
+  static String get deviceSecret =>
+      _secureSettingsBox.get(AppConstants.keyDeviceSecret) as String;
 
   static String get userName =>
       _secureSettingsBox

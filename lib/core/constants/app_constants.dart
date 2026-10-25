@@ -46,6 +46,7 @@ class AppConstants {
   static const String keyThemeMode = 'theme_mode';
   static const String keyOnboardingDone = 'onboarding_done';
   static const String keyEncryptionKey = 'encryption_key';
+  static const String keyDeviceSecret = 'device_secret';
   static const String keyInternetMode = 'internet_mode';
   static const String keyAutoCleanup = 'auto_cleanup';
   static const String keyAutoPlayStories = 'auto_play_stories';
