@@ -20,10 +20,9 @@ class AppConstants {
   static const String serviceId = 'com.upchat.p2p';
   static const String strategy = 'P2P_CLUSTER';
 
-  // Signalisation mode internet (Vercel)
-  // Remplace par ton URL de déploiement upchat-signal si différente
+  // Signalisation mode internet (Render + PostgreSQL)
   static const String signalingBaseUrl =
-      'https://upchat-signal-cmr-school.vercel.app';
+      'https://upchat-signal.onrender.com';
 
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);
