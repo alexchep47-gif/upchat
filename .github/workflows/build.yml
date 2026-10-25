@@ -30,7 +30,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate UpChat U app icon
-        run: dart run flutter_launcher_icons
+        run: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
       - name: Ensure Android platform files
         run: |

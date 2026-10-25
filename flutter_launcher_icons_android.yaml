@@ -1,0 +1,6 @@
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: assets/upchat_u_icon.png
+  adaptive_icon_background: '#128C7E'
+  adaptive_icon_foreground: assets/upchat_u_icon.png
