@@ -9,6 +9,7 @@ import '../models/message_model.dart';
 import '../models/user_model.dart';
 import 'phone_directory_service.dart';
 import 'storage_service.dart';
+import 'firebase_auth_service.dart';
 
 /// Mode internet optionnel (hybride)
 ///
@@ -54,11 +55,15 @@ class InternetService {
     return Uri.parse('$base$path').replace(queryParameters: query);
   }
 
-  Map<String, String> get _headers => {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ${StorageService.deviceSecret}',
-        'X-UpChat-Client': AppConstants.appVersion,
-      };
+  Future<Map<String, String>> get _headers async {
+    final firebaseUser = FirebaseAuthService.instance.currentUser;
+    final firebaseToken = await firebaseUser?.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ${firebaseToken?.isNotEmpty == true ? firebaseToken : StorageService.deviceSecret}',
+      'X-UpChat-Client': AppConstants.appVersion,
+    };
+  }
 
   /// Active / désactive le mode internet
   Future<void> setEnabled(bool value) async {
@@ -120,16 +125,16 @@ class InternetService {
     try {
       final phone = StorageService.userPhone;
       final body = {
-        'userId': StorageService.userId,
+        'userId': FirebaseAuthService.instance.currentUser?.uid ?? StorageService.userId,
         'name': StorageService.userName,
-        'deviceSecret': StorageService.deviceSecret,
+        if (FirebaseAuthService.instance.currentUser == null) 'deviceSecret': StorageService.deviceSecret,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       };
 
       final res = await http
           .post(
             _uri('/api/register'),
-            headers: _headers,
+            headers: await _headers,
             body: jsonEncode(body),
           )
           .timeout(const Duration(seconds: 12));
@@ -156,7 +161,7 @@ class InternetService {
         await http
             .post(
               _uri('/api/presence'),
-              headers: _headers,
+              headers: await _headers,
               body: jsonEncode({
                 'userId': StorageService.userId,
                 'phone': StorageService.userPhone,
@@ -182,7 +187,7 @@ class InternetService {
     _inboxPullInProgress = true;
     try {
       final res = await http
-          .get(_uri('/api/inbox', {'limit': '100'}), headers: _headers)
+          .get(_uri('/api/inbox', {'limit': '100'}), headers: await _headers)
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 401) {
         _isConnectedToSignaling = false;
@@ -233,7 +238,7 @@ class InternetService {
 
     try {
       final res = await http
-          .get(_uri('/api/lookup', {'phone': phone}), headers: _headers)
+          .get(_uri('/api/lookup', {'phone': phone}), headers: await _headers)
           .timeout(const Duration(seconds: 10));
 
       if (res.statusCode == 200) {
@@ -314,7 +319,7 @@ class InternetService {
       final res = await http
           .post(
             _uri('/api/message'),
-            headers: _headers,
+            headers: await _headers,
             body: jsonEncode(payload),
           )
           .timeout(const Duration(seconds: 12));

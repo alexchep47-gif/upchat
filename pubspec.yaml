@@ -23,7 +23,7 @@ dependencies:
   # Authentification distante facultative (le mode hors ligne reste autonome)
   firebase_core: 2.32.0
   firebase_auth: 4.20.0
-  google_sign_in: 6.2.1
+  google_sign_in: 5.4.2
   sign_in_with_apple: ^6.1.4
 
   # P2P Nearby Connections (Bluetooth + WiFi Direct)
@@ -63,6 +63,6 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/upchat_u_icon.png
-  adaptive_icon_background: '#128C7E'
+  adaptive_icon_background: '#2AABEE'
   adaptive_icon_foreground: assets/upchat_u_icon.png
   remove_alpha_ios: true

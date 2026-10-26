@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../firebase_options.dart';
 
 /// Authentification distante optionnelle. Le mode hors ligne ne dépend pas
 /// de Firebase et reste utilisable sans compte.
@@ -17,7 +18,11 @@ class FirebaseAuthService {
   Future<bool> initialize() async {
     if (_auth != null) return true;
     try {
-      if (Firebase.apps.isEmpty) await Firebase.initializeApp();
+      if (Firebase.apps.isEmpty) {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      }
       _auth = FirebaseAuth.instance;
       lastError = null;
       return true;

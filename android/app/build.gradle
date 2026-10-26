@@ -27,10 +27,23 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        release {
+            def keystore = file('release-keystore.jks')
+            if (keystore.exists()) {
+                storeFile = keystore
+                storePassword = System.getenv('UPCHAT_KEYSTORE_PASSWORD') ?: ''
+                keyAlias = System.getenv('UPCHAT_KEY_ALIAS') ?: 'upchat'
+                keyPassword = System.getenv('UPCHAT_KEY_PASSWORD') ?: ''
+            }
+        }
+    }
     buildTypes {
         release {
-            // Signature debug pour simplifier GitHub Actions
-            signingConfig = signingConfigs.debug
+            // Keystore fixe injectée par CI ; fallback debug uniquement pour un build local.
+            signingConfig = file('release-keystore.jks').exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
             minifyEnabled false
             shrinkResources false
         }

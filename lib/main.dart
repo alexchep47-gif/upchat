@@ -9,6 +9,7 @@ import 'core/theme/app_colors.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
 import 'data/services/storage_service.dart';
+import 'data/services/firebase_auth_service.dart';
 import 'data/services/cleanup_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/profile_provider.dart';
@@ -36,6 +37,9 @@ Future<void> _initializeApp() async {
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
   }
+  // Firebase est optionnel : l’initialisation locale est tentée avant runApp,
+  // mais une configuration absente ne bloque jamais le mode hors ligne.
+  await FirebaseAuthService.instance.initialize();
 }
 class AppBootstrap extends StatefulWidget {
   const AppBootstrap({super.key});

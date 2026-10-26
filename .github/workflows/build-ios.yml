@@ -35,6 +35,15 @@ jobs:
           mv ios/Podfile.tmp ios/Podfile
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' ios/Runner.xcodeproj/project.pbxproj
 
+      - name: Inject Firebase Flutter options
+        env:
+          FIREBASE_OPTIONS_DART_BASE64: ${{ secrets.FIREBASE_OPTIONS_DART_BASE64 }}
+        run: |
+          if [ -n "$FIREBASE_OPTIONS_DART_BASE64" ]; then
+            printf '%s' "$FIREBASE_OPTIONS_DART_BASE64" | base64 --decode > lib/firebase_options.dart
+          else
+            echo "FIREBASE_OPTIONS_DART_BASE64 absent — Firebase restera désactivé sans bloquer le mode hors ligne"
+          fi
       - name: Configure iOS privacy descriptions
         run: |
           /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string UpChat utilise Bluetooth pour découvrir les appareils proches." ios/Runner/Info.plist || true
@@ -51,6 +60,16 @@ jobs:
             printf '%s' "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
           else
             echo "FIREBASE_IOS_PLIST_BASE64 absent — build iOS sans authentification Firebase distante"
+          fi
+          if [ -f ios/Runner/GoogleService-Info.plist ]; then
+            python3 tooling/add_ios_plist_to_xcode.py ios/Runner.xcodeproj/project.pbxproj ios/Runner/GoogleService-Info.plist
+            REVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' ios/Runner/GoogleService-Info.plist 2>/dev/null || true)
+            if [ -n "$REVERSED_CLIENT_ID" ]; then
+              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes array' ios/Runner/Info.plist 2>/dev/null || true
+              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0 dict' ios/Runner/Info.plist 2>/dev/null || true
+              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' ios/Runner/Info.plist 2>/dev/null || true
+              /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist 2>/dev/null || true
+            fi
           fi
       - name: Get dependencies
         run: flutter pub get

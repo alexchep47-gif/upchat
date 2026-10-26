@@ -101,12 +101,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Continuer avec Google',
                     onPressed: _loading ? null : _googleLogin,
                   ),
-                  const SizedBox(height: 14),
-                  _AuthButton(
-                    icon: Icon(Icons.apple, color: text, size: 25),
-                    label: 'Continuer avec Apple',
-                    onPressed: null,
-                  ),
                   const SizedBox(height: 24),
                   Divider(color: muted.withOpacity(.25)),
                   InkWell(
