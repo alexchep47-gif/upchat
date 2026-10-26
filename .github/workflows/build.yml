@@ -9,6 +9,7 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: write
 
 jobs:
   build-apk:
@@ -149,6 +150,14 @@ jobs:
           flutter-version: '3.24.5'
           channel: 'stable'
 
+      - name: Inject Firebase Flutter options (web)
+        env:
+          FIREBASE_OPTIONS_DART_BASE64: ${{ secrets.FIREBASE_OPTIONS_DART_BASE64 }}
+        run: |
+          if [ -n "$FIREBASE_OPTIONS_DART_BASE64" ]; then
+            printf '%s' "$FIREBASE_OPTIONS_DART_BASE64" | base64 --decode > lib/firebase_options.dart
+          fi
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -159,7 +168,16 @@ jobs:
           fi
 
       - name: Build Flutter Web for Vercel (/app/)
-        run: flutter build web --release --base-href "/app/"
+        run: |
+          flutter build web --release --base-href "/app/"
+          BUILD_ID="${{ github.sha }}"
+          echo "$BUILD_ID" > build/web/.last_build_id
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > build/web/.deployed_at
+          if [ -f build/web/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html
+            sed -i "s|main.dart.js|main.dart.js?v=${BUILD_ID}|g" build/web/index.html
+          fi
 
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
@@ -194,28 +212,56 @@ jobs:
           cp build/universal/app-release.apk /tmp/upchat-web/downloads/UpChat-universal.apk
           VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}' | tr '+' '-')
           cp build/universal/app-release.apk "/tmp/upchat-web/downloads/UpChat-${VER}-universal.apk"
+          echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
+          echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
           cd /tmp/upchat-web
           git add -A
-          git commit -m "Deploy UpChat ${BUILD_ID}" || echo "Nothing to commit"
+          git commit -m "Deploy UpChat web ${BUILD_ID}" || echo "Nothing to commit"
           git push origin main
 
-      - name: Deploy to GitHub Pages (branche gh-pages)
+      - name: Build + force-publish GitHub Pages (latest web)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flutter build web --release --base-href "/upchat/" -o build/web-pages
+          set -e
           BUILD_ID="${{ github.sha }}"
-          rm -rf /tmp/upchat-pages && mkdir -p /tmp/upchat-pages
+          flutter build web --release --base-href "/upchat/" -o build/web-pages
+          echo "$BUILD_ID" > build/web-pages/.last_build_id
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > build/web-pages/.deployed_at
+          if [ -f build/web-pages/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html
+            sed -i "s|main.dart.js|main.dart.js?v=${BUILD_ID}|g" build/web-pages/index.html
+            # anti-cache navigateur
+            if ! grep -q 'no-cache' build/web-pages/index.html; then
+              sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n<meta http-equiv="Pragma" content="no-cache"/>\n</head>|' build/web-pages/index.html
+            fi
+          fi
+          rm -rf /tmp/upchat-pages && mkdir -p /tmp/upchat-pages/downloads
           cp -a build/web-pages/. /tmp/upchat-pages/
-          mkdir -p /tmp/upchat-pages/downloads
           cp build/universal/app-release.apk /tmp/upchat-pages/downloads/UpChat-universal.apk
+          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}' | tr '+' '-')
+          cp build/universal/app-release.apk "/tmp/upchat-pages/downloads/UpChat-${VER}-universal.apk"
           cd /tmp/upchat-pages
-          git init && git checkout -b gh-pages
+          git init
+          git checkout -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A && git commit -m "GitHub Pages UpChat ${BUILD_ID}"
+          git add -A
+          git commit -m "GitHub Pages UpChat ${BUILD_ID} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
           git push -f origin gh-pages
+          echo "Pages branch updated: https://alexchep47-gif.github.io/upchat/?v=${BUILD_ID}"
+
+      - name: Trigger official Pages deployment job
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -sS -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/alexchep47-gif/upchat/actions/workflows/deploy-pages.yml/dispatches" \
+            -d '{"ref":"main"}' || true
 
       - name: Deploy to Firebase Hosting
         env:
