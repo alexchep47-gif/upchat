@@ -86,6 +86,11 @@ jobs:
       - name: Generate UpChat U app icon
         run: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
+      - name: Use debug signing for this test build
+        run: |
+          echo "::warning::Publication Android/Web de test : signature debug temporaire, la keystore de production sera réactivée après validation Firebase"
+          rm -f android/app/release-keystore.jks
+
       - name: Ensure Android platform files
         run: |
           if [ ! -f android/settings.gradle ] || [ ! -f android/app/build.gradle ]; then
