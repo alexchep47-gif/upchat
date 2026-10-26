@@ -56,6 +56,24 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Validate Android release keystore
+        env:
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
+        run: |
+          if [ -f android/app/release-keystore.jks ]; then
+            STORE_PASSWORD=$(printf '%s' "$UPCHAT_KEYSTORE_PASSWORD" | tr -d '\r\n')
+            KEY_ALIAS=$(printf '%s' "${UPCHAT_KEY_ALIAS:-upchat}" | tr -d '\r\n')
+            if keytool -list -keystore android/app/release-keystore.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "Release keystore valide — APK signé en production"
+            else
+              echo "::warning::Keystore release invalide ou mot de passe incorrect — repli temporaire sur la signature debug pour ne pas bloquer Web/Pages"
+              rm -f android/app/release-keystore.jks
+            fi
+          else
+            echo "Signature debug de secours — aucune keystore release injectée"
+          fi
+
       - name: Generate UpChat U app icon
         run: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
 
