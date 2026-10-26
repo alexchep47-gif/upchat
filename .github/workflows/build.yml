@@ -261,6 +261,29 @@ jobs:
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
           git push -f origin gh-pages
           echo "Publié sur https://alexchep47-gif.github.io/upchat/?v=${BUILD_ID}"
+
+      - name: Build Flutter Web for Firebase Hosting (/)
+        run: |
+          flutter build web --release --base-href "/" -o build/web-firebase
+          BUILD_ID="${{ github.sha }}"
+          echo "$BUILD_ID" > build/web-firebase/.last_build_id
+          if [ -f build/web-firebase/index.html ]; then
+            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-firebase/index.html
+            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-firebase/index.html
+          fi
+
+      - name: Deploy to Firebase Hosting (upchat-android.firebaseapp.com)
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON absent — Firebase Hosting non déployé"
+            exit 0
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive
+
       - name: Trigger GitHub Pages deployment
         env:
           GH_PAT: ${{ secrets.GH_PAT }}

@@ -15,6 +15,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _expanded = false;
+  bool _creatingAccount = false;
   bool _loading = false;
   String? _message;
 
@@ -60,6 +61,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result == null && mounted) {
         setState(() => _message = FirebaseAuthService.instance.lastError);
       }
+    });
+  }
+
+  Future<void> _createAccount() async {
+    await _run(() async {
+      if (_email.text.trim().isEmpty || _password.text.length < 6) {
+        if (mounted) setState(() => _message = 'Utilise une adresse e-mail et un mot de passe d’au moins 6 caractères.');
+        return;
+      }
+      final result = await FirebaseAuthService.instance.createAccount(_email.text, _password.text);
+      if (result == null && mounted) setState(() => _message = FirebaseAuthService.instance.lastError);
     });
   }
 
@@ -120,14 +132,23 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 12),
                     TextField(controller: _password, obscureText: true, decoration: const InputDecoration(labelText: 'Mot de passe', prefixIcon: Icon(Icons.lock_outline))),
                     const SizedBox(height: 16),
-                    SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : _emailLogin, child: Text(_loading ? 'Connexion…' : 'Se connecter'))),
+                    SizedBox(width: double.infinity, child: FilledButton(onPressed: _loading ? null : (_creatingAccount ? _createAccount : _emailLogin), child: Text(_loading ? 'Patiente…' : (_creatingAccount ? 'Créer mon compte' : 'Se connecter')))),
                   ],
                   if (_message != null) ...[
                     const SizedBox(height: 16),
                     Text(_message!, style: TextStyle(color: dark ? Colors.orangeAccent : Colors.redAccent)),
                   ],
                   const SizedBox(height: 34),
-                  Center(child: Text.rich(TextSpan(text: 'Pas encore de compte ? ', style: TextStyle(color: muted, fontSize: 16), children: [TextSpan(text: 'Créer mon compte', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700))]))),
+                  Center(
+                    child: TextButton(
+                      onPressed: _loading ? null : () => setState(() {
+                        _expanded = true;
+                        _creatingAccount = !_creatingAccount;
+                        _message = null;
+                      }),
+                      child: Text(_creatingAccount ? 'J’ai déjà un compte' : 'Créer mon compte', style: TextStyle(color: AppColors.primary, fontSize: 16, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
                 ],
               ),
             ),

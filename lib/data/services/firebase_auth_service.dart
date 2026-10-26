@@ -58,6 +58,11 @@ class FirebaseAuthService {
 
   Future<UserCredential?> signInWithGoogle() async {
     if (!await initialize()) return null;
+    if (kIsWeb) {
+      final provider = GoogleAuthProvider()
+        ..setCustomParameters({'prompt': 'select_account'});
+      return _auth!.signInWithPopup(provider);
+    }
     final googleUser = await GoogleSignIn().signIn();
     if (googleUser == null) return null;
     final auth = await googleUser.authentication;
