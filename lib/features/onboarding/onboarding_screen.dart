@@ -312,7 +312,7 @@ class _OnboardingHeader extends StatelessWidget {
             child: const Icon(Icons.forum_rounded, color: Colors.white),
           ),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: Text(
               'UpChat',
               style: TextStyle(
@@ -367,7 +367,7 @@ class _ContentCard extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: Theme.of(context).colorScheme.onSurface,
               fontSize: 25,
               fontWeight: FontWeight.w800,
@@ -377,7 +377,7 @@ class _ContentCard extends StatelessWidget {
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 15,
               height: 1.45,
