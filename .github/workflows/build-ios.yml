@@ -87,9 +87,13 @@ jobs:
           APP=$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)
           test -n "$ARCHIVE"
           test -n "$APP"
+          rm -rf build/ios/ipa /tmp/upchat-ipa
           mkdir -p build/ios/ipa /tmp/upchat-ipa/Payload
           cp -R "$APP" /tmp/upchat-ipa/Payload/
+          test -d /tmp/upchat-ipa/Payload/Runner.app
           (cd /tmp/upchat-ipa && zip -qry "$GITHUB_WORKSPACE/build/ios/ipa/UpChat.ipa" Payload)
+          unzip -l build/ios/ipa/UpChat.ipa | grep -q '^.*Payload/Runner.app/'
+          echo "IPA valide : Payload/Runner.app à la racine"
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
