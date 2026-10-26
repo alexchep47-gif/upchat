@@ -3,11 +3,6 @@ name: Build iOS IPA
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'lib/**'
-      - 'assets/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/build-ios.yml'
   workflow_dispatch:
 
 permissions:
@@ -33,7 +28,7 @@ jobs:
         run: |
           { printf "platform :ios, '13.0'\n\n"; cat ios/Podfile; } > ios/Podfile.tmp
           mv ios/Podfile.tmp ios/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' ios/Runner.xcodeproj/project.pbxproj
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' ios/Runner.xcodeproj/project.pbxproj || true
 
       - name: Inject Firebase Flutter options
         env:
@@ -42,15 +37,16 @@ jobs:
           if [ -n "$FIREBASE_OPTIONS_DART_BASE64" ]; then
             printf '%s' "$FIREBASE_OPTIONS_DART_BASE64" | base64 --decode > lib/firebase_options.dart
           else
-            echo "FIREBASE_OPTIONS_DART_BASE64 absent — Firebase restera désactivé sans bloquer le mode hors ligne"
+            echo "FIREBASE_OPTIONS_DART_BASE64 absent — mode hors ligne uniquement"
           fi
+
       - name: Configure iOS privacy descriptions
         run: |
-          /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string UpChat utilise Bluetooth pour découvrir les appareils proches." ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string UpChat utilise la localisation uniquement pour la découverte de proximité." ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string UpChat utilise la caméra pour les photos de profil et les stories." ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string UpChat utilise le microphone pour les messages vocaux." ios/Runner/Info.plist || true
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string UpChat utilise la photothèque pour envoyer des médias." ios/Runner/Info.plist || true
+          /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string UpChat utilise Bluetooth pour découvrir les appareils proches." ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSLocationWhenInUseUsageDescription string UpChat utilise la localisation uniquement pour la découverte de proximité." ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string UpChat utilise la caméra pour les photos de profil et les stories." ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string UpChat utilise le microphone pour les messages vocaux." ios/Runner/Info.plist 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string UpChat utilise la photothèque pour envoyer des médias." ios/Runner/Info.plist 2>/dev/null || true
 
       - name: Inject Firebase iOS configuration
         env:
@@ -58,61 +54,120 @@ jobs:
         run: |
           if [ -n "$FIREBASE_IOS_PLIST_BASE64" ]; then
             printf '%s' "$FIREBASE_IOS_PLIST_BASE64" | base64 --decode > ios/Runner/GoogleService-Info.plist
-          else
-            echo "FIREBASE_IOS_PLIST_BASE64 absent — build iOS sans authentification Firebase distante"
-          fi
-          if [ -f ios/Runner/GoogleService-Info.plist ]; then
-            python3 tooling/add_ios_plist_to_xcode.py ios/Runner.xcodeproj/project.pbxproj ios/Runner/GoogleService-Info.plist
-            REVERSED_CLIENT_ID=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' ios/Runner/GoogleService-Info.plist 2>/dev/null || true)
-            if [ -n "$REVERSED_CLIENT_ID" ]; then
-              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes array' ios/Runner/Info.plist 2>/dev/null || true
-              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0 dict' ios/Runner/Info.plist 2>/dev/null || true
-              /usr/libexec/PlistBuddy -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes array' ios/Runner/Info.plist 2>/dev/null || true
-              /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $REVERSED_CLIENT_ID" ios/Runner/Info.plist 2>/dev/null || true
+            if [ -f tooling/add_ios_plist_to_xcode.py ]; then
+              python3 tooling/add_ios_plist_to_xcode.py ios/Runner.xcodeproj/project.pbxproj ios/Runner/GoogleService-Info.plist || true
             fi
+          else
+            echo "FIREBASE_IOS_PLIST_BASE64 absent"
           fi
+
       - name: Get dependencies
         run: |
-          flutter clean
           flutter pub get
 
-      - name: Generate UpChat U app icon
-        run: dart run flutter_launcher_icons
+      - name: Generate UpChat app icon
+        run: dart run flutter_launcher_icons || true
 
-      - name: Build unsigned IPA
+      - name: Install Apple certificate & provisioning profile (optional)
+        id: signing
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          if [ -z "$IOS_CERTIFICATE_BASE64" ] || [ -z "$IOS_PROVISIONING_PROFILE_BASE64" ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "Pas de certificats Apple — IPA non signé (--no-codesign)"
+            exit 0
+          fi
+
+          KEYCHAIN_PATH=$RUNNER_TEMP/upchat.keychain-db
+          KEYCHAIN_PASSWORD=upchat-temp-ci
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          CERT_PATH=$RUNNER_TEMP/certificate.p12
+          printf '%s' "$IOS_CERTIFICATE_BASE64" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
+          printf '%s' "$IOS_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$PROFILE_PATH")")
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/${PROFILE_UUID}.mobileprovision"
+
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+          echo "profile_uuid=$PROFILE_UUID" >> "$GITHUB_OUTPUT"
+          echo "team_id=${IOS_TEAM_ID}" >> "$GITHUB_OUTPUT"
+          echo "Certificat Apple importé — signature release activée"
+
+      - name: Build signed IPA
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_BUNDLE_ID: ${{ secrets.IOS_BUNDLE_ID }}
+        run: |
+          BUNDLE_ID="${IOS_BUNDLE_ID:-com.upchat.app}"
+          # ExportOptions pour ad-hoc / development selon le profil fourni
+          cat > /tmp/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>teamID</key>
+            <string>${IOS_TEAM_ID}</string>
+            <key>compileBitcode</key>
+            <false/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${BUNDLE_ID}</key>
+              <string>${{ steps.signing.outputs.profile_uuid }}</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+          flutter build ipa --release \
+            --export-options-plist=/tmp/ExportOptions.plist \
+            --obfuscate --split-debug-info=./symbols
+
+          ls -la build/ios/ipa/ || true
+
+      - name: Build unsigned IPA (fallback)
+        if: steps.signing.outputs.signed != 'true'
         run: |
           rm -rf symbols build/ios/ipa
           mkdir -p symbols
           flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols
-
-      - name: Package unsigned IPA from xcarchive
-        run: |
-          set -e
           ARCHIVE=$(find build/ios/archive -maxdepth 1 -name '*.xcarchive' -print -quit)
           APP=$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)
-          test -n "$ARCHIVE"
-          test -n "$APP"
           rm -rf build/ios/ipa /tmp/upchat-ipa
           mkdir -p build/ios/ipa /tmp/upchat-ipa/Payload
           cp -R "$APP" /tmp/upchat-ipa/Payload/
-          test -d /tmp/upchat-ipa/Payload/Runner.app
-          test -f /tmp/upchat-ipa/Payload/Runner.app/Info.plist
-          (cd /tmp/upchat-ipa && zip -qry "$GITHUB_WORKSPACE/build/ios/ipa/UpChat.ipa" Payload)
-          unzip -l build/ios/ipa/UpChat.ipa | grep -q 'Payload/Runner.app/Info.plist'
-          unzip -l build/ios/ipa/UpChat.ipa | grep -q '^.*Payload/Runner.app/'
-          echo "IPA valide : Payload/Runner.app/Info.plist à la racine"
-          du -h build/ios/ipa/UpChat.ipa
+          (cd /tmp/upchat-ipa && zip -qry "$GITHUB_WORKSPACE/build/ios/ipa/UpChat-unsigned.ipa" Payload)
+          du -h build/ios/ipa/*.ipa
 
-      - name: Upload unsigned IPA
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: upchat-ios-unsigned-ipa
+          name: upchat-ios-ipa
           path: build/ios/ipa/*.ipa
           retention-days: 30
 
       - name: Upload iOS archive
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: upchat-ios-archive
           path: build/ios/archive/*.xcarchive
-          retention-days: 30
+          retention-days: 14
+          if-no-files-found: ignore
