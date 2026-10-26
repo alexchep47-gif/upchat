@@ -32,9 +32,9 @@ android {
             def keystore = file('release-keystore.jks')
             if (keystore.exists()) {
                 storeFile = keystore
-                storePassword = System.getenv('UPCHAT_KEYSTORE_PASSWORD') ?: ''
-                keyAlias = System.getenv('UPCHAT_KEY_ALIAS') ?: 'upchat'
-                keyPassword = System.getenv('UPCHAT_KEY_PASSWORD') ?: ''
+                storePassword = (System.getenv('UPCHAT_KEYSTORE_PASSWORD') ?: '').trim()
+                keyAlias = (System.getenv('UPCHAT_KEY_ALIAS') ?: 'upchat').trim()
+                keyPassword = (System.getenv('UPCHAT_KEY_PASSWORD') ?: '').trim()
             }
         }
     }
