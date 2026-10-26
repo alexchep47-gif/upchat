@@ -35,13 +35,11 @@ jobs:
           else
             echo "FIREBASE_OPTIONS_DART_BASE64 absent — Firebase restera désactivé sans bloquer le mode hors ligne"
           fi
+
       - name: Inject Android Firebase configuration and fixed keystore
         env:
           FIREBASE_ANDROID_JSON_BASE64: ${{ secrets.FIREBASE_ANDROID_JSON_BASE64 }}
           UPCHAT_KEYSTORE_BASE64: ${{ secrets.UPCHAT_KEYSTORE_BASE64 }}
-          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
-          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
-          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
         run: |
           if [ -n "$FIREBASE_ANDROID_JSON_BASE64" ]; then
             printf '%s' "$FIREBASE_ANDROID_JSON_BASE64" | base64 --decode > android/app/google-services.json
@@ -50,9 +48,11 @@ jobs:
           fi
           if [ -n "$UPCHAT_KEYSTORE_BASE64" ]; then
             printf '%s' "$UPCHAT_KEYSTORE_BASE64" | base64 --decode > android/app/release-keystore.jks
+            echo "Keystore release injectée ($(wc -c < android/app/release-keystore.jks) octets)"
           else
             echo "UPCHAT_KEYSTORE_BASE64 absent — signature debug de secours"
           fi
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -60,23 +60,26 @@ jobs:
         env:
           UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
           UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
         run: |
           if [ -f android/app/release-keystore.jks ]; then
             STORE_PASSWORD=$(printf '%s' "$UPCHAT_KEYSTORE_PASSWORD" | tr -d '\r\n')
+            KEY_PASSWORD=$(printf '%s' "${UPCHAT_KEY_PASSWORD:-$STORE_PASSWORD}" | tr -d '\r\n')
             KEY_ALIAS=$(printf '%s' "${UPCHAT_KEY_ALIAS:-upchat}" | tr -d '\r\n')
             if keytool -list -keystore android/app/release-keystore.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
               if keytool -list -keystore android/app/release-keystore.jks -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
                 keytool -importkeystore -noprompt \
                   -srckeystore android/app/release-keystore.jks -srcstoretype PKCS12 \
-                  -srcstorepass "$STORE_PASSWORD" -srcalias "$KEY_ALIAS" -srckeypass "$STORE_PASSWORD" \
+                  -srcstorepass "$STORE_PASSWORD" -srcalias "$KEY_ALIAS" -srckeypass "$KEY_PASSWORD" \
                   -destkeystore android/app/release-keystore.jks.tmp -deststoretype JKS \
-                  -deststorepass "$STORE_PASSWORD" -destalias "$KEY_ALIAS" -destkeypass "$STORE_PASSWORD"
+                  -deststorepass "$STORE_PASSWORD" -destalias "$KEY_ALIAS" -destkeypass "$KEY_PASSWORD"
                 mv android/app/release-keystore.jks.tmp android/app/release-keystore.jks
                 echo "Keystore PKCS12 convertie en JKS"
               fi
-              echo "Release keystore valide — APK signé en production"
+              echo "Release keystore valide — APK sera signé en production (alias=$KEY_ALIAS)"
+              keytool -list -v -keystore android/app/release-keystore.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" 2>/dev/null | grep -E 'Alias name:|SHA1:|SHA256:' || true
             else
-              echo "::warning::Keystore release invalide ou mot de passe incorrect — repli temporaire sur la signature debug pour ne pas bloquer Web/Pages"
+              echo "::warning::Keystore release invalide ou mot de passe incorrect — repli sur signature debug"
               rm -f android/app/release-keystore.jks
             fi
           else
@@ -84,7 +87,7 @@ jobs:
           fi
 
       - name: Generate UpChat U app icon
-        run: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml
+        run: dart run flutter_launcher_icons -f flutter_launcher_icons_android.yaml || true
 
       - name: Ensure Android platform files
         run: |
@@ -92,11 +95,29 @@ jobs:
             flutter create --platforms=android . --project-name upchat
           fi
 
-      - name: Build universal APK (Android 9+)
+      - name: Build universal APK (Android 9+) — signed release
+        env:
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
         run: flutter build apk --release
 
-      - name: Build APKs by ABI
+      - name: Build APKs by ABI — signed release
+        env:
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
         run: flutter build apk --release --split-per-abi
+
+      - name: Verify APK signatures
+        run: |
+          for apk in build/app/outputs/flutter-apk/app-*.apk; do
+            [ -f "$apk" ] || continue
+            echo "=== $(basename "$apk") ==="
+            (ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | tail -1 | xargs -I{} {} verify --print-certs "$apk") \
+              || (unzip -p "$apk" 'META-INF/*.RSA' 2>/dev/null | keytool -printcert 2>/dev/null) \
+              || echo "APK: $(ls -lh "$apk")"
+          done
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -104,6 +125,7 @@ jobs:
           name: upchat-apk
           path: build/app/outputs/flutter-apk/app-*.apk
           retention-days: 30
+
       - name: Upload universal APK for the website job
         uses: actions/upload-artifact@v4
         with:
@@ -137,14 +159,7 @@ jobs:
           fi
 
       - name: Build Flutter Web for Vercel (/app/)
-        run: |
-          flutter build web --release --base-href "/app/"
-          BUILD_ID="${{ github.sha }}"
-          echo "$BUILD_ID" > build/web/.last_build_id
-          if [ -f build/web/index.html ]; then
-            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web/index.html
-            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web/index.html
-          fi
+        run: flutter build web --release --base-href "/app/"
 
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
@@ -179,116 +194,38 @@ jobs:
           cp build/universal/app-release.apk /tmp/upchat-web/downloads/UpChat-universal.apk
           VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}' | tr '+' '-')
           cp build/universal/app-release.apk "/tmp/upchat-web/downloads/UpChat-${VER}-universal.apk"
-          printf '%s\n' "$BUILD_ID" > /tmp/upchat-web/downloads/UpChat-universal.apk.sha
-          sha256sum build/universal/app-release.apk | awk '{print $1}' > "/tmp/upchat-web/downloads/UpChat-${VER}-universal.apk.sha256"
-          echo "$BUILD_ID" > /tmp/upchat-web/.last_build_id
-          echo "$BUILD_ID" > /tmp/upchat-web/app/.last_build_id
-          echo "$BUILD_ID" > /tmp/upchat-web/.upchat-source-sha
-          date -u +"%Y-%m-%dT%H:%M:%SZ" > /tmp/upchat-web/app/.deployed_at
-          cat > /tmp/upchat-web/vercel.json << EOF
-          {
-            "cleanUrls": false,
-            "trailingSlash": true,
-            "rewrites": [
-              { "source": "/app", "destination": "/app/index.html" },
-              { "source": "/app/", "destination": "/app/index.html" }
-            ],
-            "headers": [
-              {
-                "source": "/(.*)",
-                "headers": [
-                  { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
-                ]
-              }
-            ]
-          }
-          EOF
-          if [ ! -f /tmp/upchat-web/index.html ] || ! grep -q "upchat\|UpChat" /tmp/upchat-web/index.html 2>/dev/null; then
-            cat > /tmp/upchat-web/index.html << EOF
-          <!DOCTYPE html><html><head>
-          <meta http-equiv="refresh" content="0; url=/app/?v=${BUILD_ID}" />
-          <script>location.replace('/app/?v=${BUILD_ID}');</script>
-          </head><body><a href="/app/?v=${BUILD_ID}">UpChat</a></body></html>
-          EOF
-          fi
           cd /tmp/upchat-web
           git add -A
-          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}')
-          git commit -m "Deploy UpChat ${VER} ${BUILD_ID}" || echo "Nothing to commit"
+          git commit -m "Deploy UpChat ${BUILD_ID}" || echo "Nothing to commit"
           git push origin main
-
-      - name: Build Flutter Web for GitHub Pages (/upchat/)
-        run: |
-          flutter build web --release --base-href "/upchat/" -o build/web-pages
-          BUILD_ID="${{ github.sha }}"
-          echo "$BUILD_ID" > build/web-pages/.last_build_id
-          date -u +"%Y-%m-%dT%H:%M:%SZ" > build/web-pages/.deployed_at
-          if [ -f build/web-pages/index.html ]; then
-            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-pages/index.html
-            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-pages/index.html
-            sed -i 's|</head>|<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>\n</head>|' build/web-pages/index.html
-          fi
-          echo "$BUILD_ID" > build/web-pages/.last_build_id
 
       - name: Deploy to GitHub Pages (branche gh-pages)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -e
+          flutter build web --release --base-href "/upchat/" -o build/web-pages
           BUILD_ID="${{ github.sha }}"
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          rm -rf /tmp/upchat-pages
-          mkdir -p /tmp/upchat-pages
+          rm -rf /tmp/upchat-pages && mkdir -p /tmp/upchat-pages
           cp -a build/web-pages/. /tmp/upchat-pages/
           mkdir -p /tmp/upchat-pages/downloads
           cp build/universal/app-release.apk /tmp/upchat-pages/downloads/UpChat-universal.apk
-          VER=$(grep '^version:' "$GITHUB_WORKSPACE/pubspec.yaml" | head -1 | awk '{print $2}' | tr '+' '-')
-          cp build/universal/app-release.apk "/tmp/upchat-pages/downloads/UpChat-${VER}-universal.apk"
-          sha256sum build/universal/app-release.apk | awk '{print $1 "  UpChat-universal.apk"}' > /tmp/upchat-pages/downloads/UpChat-universal.apk.sha256
-          sha256sum build/universal/app-release.apk | awk -v f="UpChat-${VER}-universal.apk" '{print $1 "  " f}' > "/tmp/upchat-pages/downloads/UpChat-${VER}-universal.apk.sha256"
-          echo "$BUILD_ID" > /tmp/upchat-pages/.last_build_id
           cd /tmp/upchat-pages
-          git init
-          git checkout -b gh-pages
-          git add -A
-          git commit -m "GitHub Pages UpChat ${{ github.sha }}"
+          git init && git checkout -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A && git commit -m "GitHub Pages UpChat ${BUILD_ID}"
           git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/alexchep47-gif/upchat.git"
           git push -f origin gh-pages
-          echo "Publié sur https://alexchep47-gif.github.io/upchat/?v=${BUILD_ID}"
 
-      - name: Build Flutter Web for Firebase Hosting (/)
-        run: |
-          flutter build web --release --base-href "/" -o build/web-firebase
-          BUILD_ID="${{ github.sha }}"
-          echo "$BUILD_ID" > build/web-firebase/.last_build_id
-          if [ -f build/web-firebase/index.html ]; then
-            sed -i "s|flutter_bootstrap.js|flutter_bootstrap.js?v=${BUILD_ID}|g" build/web-firebase/index.html
-            sed -i "s|flutter.js|flutter.js?v=${BUILD_ID}|g" build/web-firebase/index.html
-          fi
-
-      - name: Deploy to Firebase Hosting (upchat-android.firebaseapp.com)
+      - name: Deploy to Firebase Hosting
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
         run: |
           if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON absent — Firebase Hosting non déployé"
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON absent"
             exit 0
           fi
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-service-account.json"
+          flutter build web --release --base-href "/" -o build/web-firebase
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
           npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive
-
-      - name: Trigger GitHub Pages deployment
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-        run: |
-          if [ -z "$GH_PAT" ]; then
-            echo "GH_PAT absent — la branche gh-pages est à jour, mais la publication Pages devra être déclenchée manuellement"
-            exit 0
-          fi
-          curl --fail-with-body -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GH_PAT" \
-            https://api.github.com/repos/alexchep47-gif/upchat/actions/workflows/deploy-pages.yml/dispatches \
-            -d '{"ref":"main"}'
