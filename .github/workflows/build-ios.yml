@@ -29,6 +29,11 @@ jobs:
       - name: Generate iOS platform files
         run: flutter create --platforms=ios --org com.upchat.app . --project-name upchat
 
+      - name: Set Firebase-compatible iOS deployment target
+        run: |
+          sed -i '' 's/platform :ios.*$/platform :ios, '\''13.0'\''/' ios/Podfile
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 12.0/IPHONEOS_DEPLOYMENT_TARGET = 13.0/g' ios/Runner.xcodeproj/project.pbxproj
+
       - name: Configure iOS privacy descriptions
         run: |
           /usr/libexec/PlistBuddy -c "Add :NSBluetoothAlwaysUsageDescription string UpChat utilise Bluetooth pour découvrir les appareils proches." ios/Runner/Info.plist || true
