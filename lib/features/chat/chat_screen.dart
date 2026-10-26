@@ -13,6 +13,7 @@ import '../../providers/chat_provider.dart';
 import '../../providers/nearby_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../widgets/empty_state.dart';
+import '../../widgets/glass_container.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
@@ -423,8 +424,8 @@ class _ChatScreenState extends State<ChatScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: isDark
-                ? [const Color(0xFF0B0B10), const Color(0xFF1B1520)]
-                : [const Color(0xFFF0E8F3), const Color(0xFFE1D8E7)],
+                ? [AppColors.backgroundDark, AppColors.surfaceDark]
+                : [AppColors.backgroundLight, const Color(0xFFEAF6FF)],
           ),
         ),
         child: LayoutBuilder(
@@ -674,21 +675,12 @@ class _QuickActionsPanel extends StatelessWidget {
     final panel = isDark ? const Color(0xB52D2332) : const Color(0xD9FFFFFF);
     final tile = isDark ? const Color(0xCC3A2F3F) : const Color(0xE6FFFFFF);
     final foreground = isDark ? Colors.white : const Color(0xFF241C2B);
-    return Container(
+    return GlassContainer(
       margin: const EdgeInsets.fromLTRB(2, 8, 2, 10),
+      blur: 20,
+      opacity: isDark ? .64 : .80,
+      borderRadius: BorderRadius.circular(22),
       padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-      decoration: BoxDecoration(
-        color: panel,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(isDark ? .08 : .55)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? .24 : .08),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

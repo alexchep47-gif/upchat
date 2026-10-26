@@ -6,6 +6,7 @@ import '../core/theme/app_colors.dart';
 class GlassContainer extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
+  final EdgeInsetsGeometry? margin;
   final BorderRadius? borderRadius;
   final double blur;
   final double opacity;
@@ -14,6 +15,7 @@ class GlassContainer extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
+    this.margin,
     this.borderRadius,
     this.blur = 16,
     this.opacity = 0.72,
@@ -24,11 +26,13 @@ class GlassContainer extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final radius = borderRadius ?? BorderRadius.circular(20);
 
-    return ClipRRect(
+    return RepaintBoundary(
+      child: ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
         child: Container(
+          margin: margin,
           padding: padding,
           decoration: BoxDecoration(
             color: (isDark ? AppColors.surfaceDark : Colors.white).withOpacity(opacity),
@@ -42,6 +46,7 @@ class GlassContainer extends StatelessWidget {
           ),
           child: child,
         ),
+      ),
       ),
     );
   }

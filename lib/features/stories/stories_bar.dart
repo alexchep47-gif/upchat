@@ -93,9 +93,9 @@ class _StoryCircle extends StatelessWidget {
                 gradient: hasStory
                     ? const LinearGradient(
                         colors: [
-                          Color(0xFF2AABEE),
-                          Color(0xFF25D366),
-                          Color(0xFFFFB800),
+                          AppColors.primary,
+                          Color(0xFF8BD8FF),
+                          AppColors.primaryDark,
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,

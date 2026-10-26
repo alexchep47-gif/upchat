@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/permission_helper.dart';
 import '../../data/services/storage_service.dart';
 import '../../providers/profile_provider.dart';
+import '../../widgets/glass_container.dart';
 
 /// Parcours de premier lancement adaptatif : bienvenue, accès système, profil.
 class OnboardingScreen extends StatefulWidget {
@@ -112,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -315,7 +316,7 @@ class _OnboardingHeader extends StatelessWidget {
             child: Text(
               'UpChat',
               style: TextStyle(
-                color: Colors.white,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
               ),
@@ -346,14 +347,11 @@ class _ContentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
+    return GlassContainer(
+      blur: 24,
+      opacity: Theme.of(context).brightness == Brightness.dark ? .74 : .84,
+      borderRadius: BorderRadius.circular(26),
       padding: const EdgeInsets.fromLTRB(22, 28, 22, 22),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
-      ),
       child: Column(
         children: [
           Container(
@@ -370,7 +368,7 @@ class _ContentCard extends StatelessWidget {
             title,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 25,
               fontWeight: FontWeight.w800,
             ),
@@ -380,7 +378,7 @@ class _ContentCard extends StatelessWidget {
             subtitle,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: AppColors.textSecondaryDark,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 15,
               height: 1.45,
             ),
@@ -416,7 +414,7 @@ class _PermissionTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(icon, color: ok ? AppColors.online : Colors.orangeAccent),
+          Icon(icon, color: ok ? AppColors.primary : Colors.orangeAccent),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

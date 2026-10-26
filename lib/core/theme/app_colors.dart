@@ -6,7 +6,7 @@ class AppColors {
   static const Color primaryDark = Color(0xFF229ED9);
   // Blue is the single UI accent; green is reserved for presence/success.
   static const Color accent = Color(0xFF2AABEE);
-  static const Color teal = Color(0xFF128C7E);
+  static const Color teal = primary;
 
   // Bulles
   static const Color bubbleMe = Color(0xFFDFF3FF);
@@ -27,11 +27,14 @@ class AppColors {
   static const Color textPrimaryDark = Color(0xFFF5F5F5);
   static const Color textSecondaryDark = Color(0xFF7D8B99);
 
-  static const Color online = Color(0xFF25D366);
+  static const Color online = primary;
   static const Color unread = Color(0xFF2AABEE);
   static const Color dividerLight = Color(0xFFE4E4E4);
   static const Color dividerDark = Color(0xFF242F3D);
   static const Color error = Color(0xFFE53935);
   static const Color glassLight = Color(0xCCFFFFFF);
   static const Color glassDark = Color(0x9917212B);
+  static const Color glassBorderLight = Color(0x33FFFFFF);
+  static const Color glassBorderDark = Color(0x22FFFFFF);
+  static const Color oledBackground = Color(0xFF000000);
 }

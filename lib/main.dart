@@ -1,11 +1,9 @@
 import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
 import 'core/constants/app_constants.dart';
@@ -19,7 +17,6 @@ import 'providers/chat_provider.dart';
 import 'providers/stories_provider.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/settings_provider.dart';
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
@@ -33,7 +30,6 @@ void main() {
   ));
   runApp(const AppBootstrap());
 }
-
 Future<void> _initializeApp() async {
   await Hive.initFlutter();
   await StorageService.init();
@@ -41,27 +37,21 @@ Future<void> _initializeApp() async {
     unawaited(CleanupService().run());
   }
 }
-
 class AppBootstrap extends StatefulWidget {
   const AppBootstrap({super.key});
-
   @override
   State<AppBootstrap> createState() => _AppBootstrapState();
 }
-
 class _AppBootstrapState extends State<AppBootstrap> {
   late Future<void> _initialization;
-
   @override
   void initState() {
     super.initState();
     _initialization = _initializeApp();
   }
-
   void _retry() {
     setState(() => _initialization = _initializeApp());
   }
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -78,92 +68,100 @@ class _AppBootstrapState extends State<AppBootstrap> {
     );
   }
 }
-
 class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         backgroundColor: AppColors.backgroundLight,
-        body: SafeArea(
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Center(
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.92, end: 1),
-                  duration: const Duration(milliseconds: 900),
-                  curve: Curves.easeOutBack,
-                  builder: (context, scale, child) => Transform.scale(
-                    scale: scale,
-                    child: child,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFFF7FBFF), Color(0xFFE7F5FF)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+          child: SafeArea(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Center(
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.82, end: 1),
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutBack,
+                    builder: (context, scale, child) => Transform.scale(
+                      scale: scale,
+                      child: FadeTransition(
+                        opacity: AlwaysStoppedAnimation<double>(scale),
+                        child: child,
+                      ),
+                    ),
+                    child: const _StartupLogo(),
                   ),
-                  child: const _StartupLogo(),
                 ),
-              ),
-              Positioned(
-                left: 24,
-                right: 24,
-                bottom: 32,
-                child: Column(
-                  children: [
-                    const Text(
-                      'UpChat',
-                      style: TextStyle(
-                        color: AppColors.textPrimaryLight,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 7),
-                    Text(
-                      'Messagerie privée',
-                      style: TextStyle(
-                        color: AppColors.textSecondaryLight.withOpacity(0.72),
-                        fontSize: 13,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    SizedBox(
-                      width: 116,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: const LinearProgressIndicator(
-                          minHeight: 3,
-                          backgroundColor: Color(0x332AABEE),
-                          color: AppColors.primary,
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 32,
+                  child: Column(
+                    children: [
+                      const Text(
+                        'UpChat',
+                        style: TextStyle(
+                          color: AppColors.textPrimaryLight,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.4,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 7),
+                      Text(
+                        'Messagerie privée',
+                        style: TextStyle(
+                          color: AppColors.textSecondaryLight,
+                          fontSize: 13,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: 116,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: const LinearProgressIndicator(
+                            minHeight: 3,
+                            backgroundColor: Color(0x332AABEE),
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
-
 class _StartupLogo extends StatelessWidget {
   const _StartupLogo();
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 116,
-      height: 116,
+      width: 220,
+      height: 220,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2AABEE).withOpacity(0.28),
+            color: AppColors.primary.withOpacity(0.28),
             blurRadius: 34,
             spreadRadius: 5,
           ),
@@ -172,15 +170,14 @@ class _StartupLogo extends StatelessWidget {
       child: ClipOval(
         child: Image.asset(
           'assets/upchat_u_icon.png',
-          width: 116,
-          height: 116,
+          width: 220,
+          height: 220,
           fit: BoxFit.cover,
         ),
       ),
     );
   }
 }
-
 class _StartupError extends StatelessWidget {
   final Object? error;
   final VoidCallback onRetry;

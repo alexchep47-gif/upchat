@@ -12,6 +12,7 @@ import '../../providers/connectivity_provider.dart';
 import '../../features/stories/stories_bar.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/profile_avatar.dart';
+import '../../widgets/glass_container.dart';
 
 class ConversationsListScreen extends StatefulWidget {
   const ConversationsListScreen({super.key});
@@ -73,7 +74,9 @@ class _ConversationsListScreenState extends State<ConversationsListScreen> {
     final hasContent = chat.conversations.isNotEmpty || nearbyCount > 0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light.copyWith(
+      value: (Theme.of(context).brightness == Brightness.dark
+          ? SystemUiOverlayStyle.light
+          : SystemUiOverlayStyle.dark).copyWith(
         statusBarColor: Colors.transparent,
         systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
       ),
@@ -274,14 +277,12 @@ class _ConversationTabs extends StatelessWidget {
       _TabData('Proches', nearbyCount),
     ];
 
-    return Container(
+    return GlassContainer(
       margin: const EdgeInsets.symmetric(horizontal: 20),
+      blur: 16,
+      opacity: Theme.of(context).brightness == Brightness.dark ? .42 : .72,
+      borderRadius: BorderRadius.circular(28),
       padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.16)),
-        borderRadius: BorderRadius.circular(28),
-        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.025),
-      ),
       child: Row(
         children: [
           for (var i = 0; i < tabs.length; i++)
@@ -293,7 +294,7 @@ class _ConversationTabs extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
                     color: selectedIndex == i
-                        ? Theme.of(context).colorScheme.onSurface.withOpacity(0.14)
+                        ? AppColors.primary.withOpacity(0.20)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(23),
                   ),
@@ -389,14 +390,12 @@ class _InfoBanner extends StatelessWidget {
             ? '${nearby.nearbyDevices.length} appareil(s) détecté(s) autour de vous.'
             : 'Les discussions restent en mode local.';
 
-    return Container(
+    return GlassContainer(
       margin: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+      blur: 16,
+      opacity: Theme.of(context).brightness == Brightness.dark ? .54 : .76,
+      borderRadius: BorderRadius.circular(18),
       padding: const EdgeInsets.fromLTRB(16, 13, 12, 13),
-      decoration: BoxDecoration(
-        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.14)),
-        borderRadius: BorderRadius.circular(18),
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      ),
       child: Row(
         children: [
           Icon(
@@ -437,7 +436,7 @@ class _InfoBanner extends StatelessWidget {
                     ? Icons.schedule_rounded
                     : Icons.cloud_off_rounded,
             color: internetEnabled && connectivity.isOnline
-                ? AppColors.online
+                ? AppColors.primary
                 : internetEnabled
                     ? AppColors.primary
                     : Theme.of(context).colorScheme.onSurfaceVariant,
@@ -742,31 +741,24 @@ class _BottomNavigation extends StatelessWidget {
 
     return SafeArea(
       top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
-        decoration: BoxDecoration(
-          color: const Color(0xE62A2A2A),
-          borderRadius: BorderRadius.circular(34),
-          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.14)),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black45,
-              blurRadius: 18,
-              offset: Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            for (var i = 0; i < items.length; i++)
-              Expanded(
-                child: _BottomNavigationItem(
-                  item: items[i],
-                  selected: selectedIndex == i,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: GlassContainer(
+          blur: 22,
+          opacity: Theme.of(context).brightness == Brightness.dark ? .72 : .82,
+          borderRadius: BorderRadius.circular(30),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          child: Row(
+            children: [
+              for (var i = 0; i < items.length; i++)
+                Expanded(
+                  child: _BottomNavigationItem(
+                    item: items[i],
+                    selected: selectedIndex == i,
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );
