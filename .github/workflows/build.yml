@@ -65,6 +65,15 @@ jobs:
             STORE_PASSWORD=$(printf '%s' "$UPCHAT_KEYSTORE_PASSWORD" | tr -d '\r\n')
             KEY_ALIAS=$(printf '%s' "${UPCHAT_KEY_ALIAS:-upchat}" | tr -d '\r\n')
             if keytool -list -keystore android/app/release-keystore.jks -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              if keytool -list -keystore android/app/release-keystore.jks -storetype PKCS12 -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+                keytool -importkeystore -noprompt \
+                  -srckeystore android/app/release-keystore.jks -srcstoretype PKCS12 \
+                  -srcstorepass "$STORE_PASSWORD" -srcalias "$KEY_ALIAS" -srckeypass "$STORE_PASSWORD" \
+                  -destkeystore android/app/release-keystore.jks.tmp -deststoretype JKS \
+                  -deststorepass "$STORE_PASSWORD" -destalias "$KEY_ALIAS" -destkeypass "$STORE_PASSWORD"
+                mv android/app/release-keystore.jks.tmp android/app/release-keystore.jks
+                echo "Keystore PKCS12 convertie en JKS"
+              fi
               echo "Release keystore valide — APK signé en production"
             else
               echo "::warning::Keystore release invalide ou mot de passe incorrect — repli temporaire sur la signature debug pour ne pas bloquer Web/Pages"
