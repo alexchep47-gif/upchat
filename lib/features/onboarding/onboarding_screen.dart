@@ -162,7 +162,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Bienvenue sur UpChat',
       subtitle:
           'Une messagerie qui s’adapte à ton réseau : proximité par Bluetooth et Wi‑Fi Direct, ou mode internet lorsque tu l’actives.',
-      child: _PrimaryButton(label: 'Continuer', onPressed: _nextPage),
+      child: Column(
+        children: [
+          _PrimaryButton(label: 'Continuer', onPressed: _nextPage),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => Navigator.pushNamed(context, AppRouter.login),
+            child: const Text('Se connecter à un compte'),
+          ),
+        ],
+      ),
     );
   }
 

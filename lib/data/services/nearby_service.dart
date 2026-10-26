@@ -14,6 +14,7 @@ import '../../core/utils/permission_helper.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
 import 'storage_service.dart';
+import 'offline_sync_service.dart';
 
 /// Service central P2P (Nearby Connections)
 class NearbyService {
@@ -30,6 +31,7 @@ class NearbyService {
   final Map<String, UserModel> _discovered = {};
   final Map<String, String> _connected = {};
   final Map<int, Map<String, dynamic>> _pendingPayloads = {};
+  final Set<String> _seenMessageIds = <String>{};
 
   Function(List<UserModel>)? onDevicesChanged;
   Function(MessageModel)? onMessageReceived;
@@ -137,6 +139,8 @@ class NearbyService {
   Future<void> _sendIdentity(String endpointId) async {
     final payload = jsonEncode({
       'type': 'identity',
+      'protocol': 'upchat.offline.v1',
+      'knownMessageIds': OfflineSyncService.instance.knownMessageIds().take(200).toList(),
       'userId': StorageService.userId,
       'name': StorageService.userName,
       'bio': StorageService.userBio,
@@ -187,8 +191,10 @@ class NearbyService {
       }
 
       if (type == 'message') {
+        final messageId = map['id'] as String? ?? _uuid.v4();
+        if (!_seenMessageIds.add(messageId)) return;
         final message = MessageModel(
-          id: map['id'] as String? ?? _uuid.v4(),
+          id: messageId,
           conversationId: map['conversationId'] as String? ?? endpointId,
           senderId: map['senderId'] as String? ?? endpointId,
           senderName: map['senderName'] as String? ?? 'Inconnu',
@@ -317,12 +323,15 @@ class NearbyService {
     final messageId = _uuid.v4();
     final payload = jsonEncode({
       'type': 'message',
+      'protocol': 'upchat.offline.v1',
       'id': messageId,
       'conversationId': conversationId,
       'senderId': StorageService.userId,
       'senderName': StorageService.userName,
       'messageType': MessageType.text.name,
       'content': text,
+      'ttl': 4,
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
     });
     try {
       await _nearby.sendBytesPayload(endpointId, Uint8List.fromList(utf8.encode(payload)));

@@ -22,7 +22,9 @@ class StorageService {
   static late Box _storiesBox;
   static late Box _phoneDirectoryBox;
 
-  static String _boxName(String name) => kIsWeb ? '${name}_web' : name;
+  // Change the Web namespace when the serialized schema changes. This avoids
+  // opening legacy IndexedDB records written with unknown Hive adapters.
+  static String _boxName(String name) => kIsWeb ? '${name}_web_v2' : name;
 
   /// Initialisation au démarrage de l'app
   static Future<void> init() async {

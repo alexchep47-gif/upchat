@@ -9,6 +9,7 @@ import '../data/services/nearby_service.dart';
 import '../data/services/mesh_service.dart';
 import '../data/services/internet_service.dart';
 import '../data/services/phone_directory_service.dart';
+import '../data/services/offline_sync_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
@@ -16,6 +17,7 @@ class ChatProvider extends ChangeNotifier {
   final MeshService _mesh = MeshService();
   final InternetService _internet = InternetService();
   final PhoneDirectoryService _phoneDir = PhoneDirectoryService();
+  final OfflineSyncService _offline = OfflineSyncService.instance;
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
@@ -39,8 +41,21 @@ class ChatProvider extends ChangeNotifier {
     };
     _nearby.onConnected = (endpointId, userId) {
       _mesh.onNewConnection(endpointId, userId);
+      _flushOfflineMessages(endpointId, userId);
     };
     _internet.onMessageReceived = _onIncomingMessage;
+  }
+
+  Future<void> _flushOfflineMessages(String endpointId, String userId) async {
+    for (final pending in _offline.pending()) {
+      if (pending.targetUserId != userId) continue;
+      final sent = await _nearby.sendTextMessage(
+        endpointId: endpointId,
+        conversationId: pending.conversationId,
+        text: pending.content,
+      );
+      if (sent) await _offline.acknowledge(pending.id);
+    }
   }
 
   void _loadFromStorage() {
@@ -113,6 +128,12 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _addLocalMessage(message, preview: text);
+    await _offline.enqueue(
+      messageId: message.id,
+      targetUserId: conversationId,
+      conversationId: conversationId,
+      content: text,
+    );
 
     bool success = false;
 
@@ -148,6 +169,7 @@ class ChatProvider extends ChangeNotifier {
 
     _updateMessageStatus(
         message.id, success ? MessageStatus.sent : MessageStatus.failed);
+    if (success) await _offline.acknowledge(message.id);
   }
 
   Future<void> sendMediaMessage({
@@ -177,6 +199,13 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _addLocalMessage(message, preview: preview);
+    await _offline.enqueue(
+      messageId: message.id,
+      targetUserId: conversationId,
+      conversationId: conversationId,
+      content: preview,
+      type: type,
+    );
 
     bool success = false;
     if (endpointId != null) {
@@ -211,6 +240,7 @@ class ChatProvider extends ChangeNotifier {
 
     _updateMessageStatus(
         message.id, success ? MessageStatus.sent : MessageStatus.failed);
+    if (success) await _offline.acknowledge(message.id);
   }
 
   void _addLocalMessage(MessageModel message, {required String preview}) {
@@ -253,6 +283,9 @@ class ChatProvider extends ChangeNotifier {
 
   void _onStatusUpdate(String messageId, MessageStatus status) {
     _updateMessageStatus(messageId, status);
+    if (status == MessageStatus.delivered || status == MessageStatus.read) {
+      _offline.acknowledge(messageId);
+    }
   }
 
   void _onIncomingMessage(MessageModel message) {
