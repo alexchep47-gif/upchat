@@ -34,7 +34,9 @@ android {
                 storeFile = keystore
                 storePassword = (System.getenv('UPCHAT_KEYSTORE_PASSWORD') ?: '').trim()
                 keyAlias = (System.getenv('UPCHAT_KEY_ALIAS') ?: 'upchat').trim()
-                keyPassword = (System.getenv('UPCHAT_KEY_PASSWORD') ?: '').trim()
+                // La keystore de production UpChat est générée avec le même
+                // mot de passe pour le magasin et la clé privée.
+                keyPassword = storePassword
             }
         }
     }
