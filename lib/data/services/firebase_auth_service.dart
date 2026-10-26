@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import '../../firebase_options.dart';
 
 /// Authentification distante optionnelle. Le mode hors ligne ne dépend pas
@@ -19,9 +20,16 @@ class FirebaseAuthService {
     if (_auth != null) return true;
     try {
       if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
-        );
+        try {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        } catch (_) {
+          // Android utilise google-services.json et iOS son plist injecté par CI.
+          // Le Web doit obligatoirement recevoir firebase_options.dart.
+          if (kIsWeb) rethrow;
+          await Firebase.initializeApp();
+        }
       }
       _auth = FirebaseAuth.instance;
       lastError = null;
