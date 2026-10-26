@@ -37,6 +37,11 @@ android {
     }
 }
 
+// The file is supplied by GitHub Actions from the Firebase project secret.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
+
 flutter {
     source = "../.."
 }

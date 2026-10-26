@@ -26,7 +26,11 @@ void main() {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Colors.transparent,
+  ));
   runApp(const AppBootstrap());
 }
 
@@ -83,7 +87,7 @@ class _StartupScreen extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: AppColors.backgroundLight,
         body: SafeArea(
           child: Stack(
             fit: StackFit.expand,
@@ -109,7 +113,7 @@ class _StartupScreen extends StatelessWidget {
                     const Text(
                       'UpChat',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimaryLight,
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.4,
@@ -119,7 +123,7 @@ class _StartupScreen extends StatelessWidget {
                     Text(
                       'Messagerie privée',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.42),
+                        color: AppColors.textSecondaryLight.withOpacity(0.72),
                         fontSize: 13,
                         letterSpacing: 0.3,
                       ),
@@ -188,7 +192,7 @@ class _StartupError extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: AppColors.backgroundLight,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
@@ -196,13 +200,13 @@ class _StartupError extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.cloud_off_rounded,
-                    color: Colors.white70, size: 48),
+                    color: AppColors.primary, size: 48),
                 const SizedBox(height: 16),
                 const Text(
                   'Impossible de préparer UpChat',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimaryLight,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
@@ -213,7 +217,7 @@ class _StartupError extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white60, fontSize: 12),
+                  style: const TextStyle(color: AppColors.textSecondaryLight, fontSize: 12),
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(

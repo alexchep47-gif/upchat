@@ -14,9 +14,9 @@ class AppTheme {
         divider: AppColors.dividerLight,
         inputFill: const Color(0xFFF1F5F9),
         overlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: AppColors.primary,
-          statusBarIconBrightness: Brightness.light,
-          systemNavigationBarColor: AppColors.surfaceLight,
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: AppColors.backgroundLight,
           systemNavigationBarIconBrightness: Brightness.dark,
         ),
       );
@@ -31,7 +31,7 @@ class AppTheme {
         divider: AppColors.dividerDark,
         inputFill: AppColors.surfaceElevatedDark,
         overlayStyle: const SystemUiOverlayStyle(
-          statusBarColor: AppColors.primary,
+          statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
           systemNavigationBarColor: AppColors.backgroundDark,
           systemNavigationBarIconBrightness: Brightness.light,
@@ -197,7 +197,7 @@ class AppTheme {
           (states) => states.contains(MaterialState.selected) ? Colors.white : secondaryText,
         ),
         trackColor: MaterialStateProperty.resolveWith(
-          (states) => states.contains(MaterialState.selected) ? AppColors.accent : divider,
+          (states) => states.contains(MaterialState.selected) ? AppColors.primary : divider,
         ),
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(color: AppColors.primary),

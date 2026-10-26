@@ -36,7 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } on FirebaseAuthException catch (error) {
       if (mounted) setState(() => _message = error.message ?? 'Connexion impossible.');
     } catch (error) {
-      if (mounted) setState(() => _message = '$error');
+      if (mounted) setState(() => _message = 'La connexion est indisponible pour le moment. Tu peux continuer à utiliser UpChat hors ligne.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

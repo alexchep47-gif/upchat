@@ -22,7 +22,7 @@ class FirebaseAuthService {
       lastError = null;
       return true;
     } catch (error) {
-      lastError = 'Firebase n’est pas encore configuré pour cette plateforme.';
+      lastError = 'La connexion à distance est momentanément indisponible. UpChat reste utilisable hors ligne.';
       return false;
     }
   }
