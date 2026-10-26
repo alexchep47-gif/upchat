@@ -72,13 +72,18 @@ jobs:
             fi
           fi
       - name: Get dependencies
-        run: flutter pub get
+        run: |
+          flutter clean
+          flutter pub get
 
       - name: Generate UpChat U app icon
         run: dart run flutter_launcher_icons
 
       - name: Build unsigned IPA
-        run: flutter build ipa --release --no-codesign
+        run: |
+          rm -rf symbols build/ios/ipa
+          mkdir -p symbols
+          flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols
 
       - name: Package unsigned IPA from xcarchive
         run: |
@@ -91,9 +96,12 @@ jobs:
           mkdir -p build/ios/ipa /tmp/upchat-ipa/Payload
           cp -R "$APP" /tmp/upchat-ipa/Payload/
           test -d /tmp/upchat-ipa/Payload/Runner.app
+          test -f /tmp/upchat-ipa/Payload/Runner.app/Info.plist
           (cd /tmp/upchat-ipa && zip -qry "$GITHUB_WORKSPACE/build/ios/ipa/UpChat.ipa" Payload)
+          unzip -l build/ios/ipa/UpChat.ipa | grep -q 'Payload/Runner.app/Info.plist'
           unzip -l build/ios/ipa/UpChat.ipa | grep -q '^.*Payload/Runner.app/'
-          echo "IPA valide : Payload/Runner.app à la racine"
+          echo "IPA valide : Payload/Runner.app/Info.plist à la racine"
+          du -h build/ios/ipa/UpChat.ipa
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
