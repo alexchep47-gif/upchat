@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -7,7 +6,6 @@ import '../../core/theme/app_glass.dart';
 import '../../providers/chat_provider.dart';
 import '../../widgets/glass_container.dart';
 
-/// Fiche contact hors-ligne (Hive local). Ouverte depuis l'avatar / nom de discussion.
 class ContactDetailScreen extends StatelessWidget {
   final String peerId;
   final String peerName;
@@ -35,7 +33,7 @@ class ContactDetailScreen extends StatelessWidget {
           SliverAppBar(
             expandedHeight: 220,
             pinned: true,
-            backgroundColor: glass.chatGradientTop.withOpacity(0.9),
+            backgroundColor: glass.chatGradientTop.withOpacity(0.92),
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
                 peerName,
@@ -82,7 +80,7 @@ class ContactDetailScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'à proximité · hors-ligne possible',
+                    'à proximité · données locales',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: isDark
@@ -94,33 +92,35 @@ class ContactDetailScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _ActionChip(
+                      _RoundAction(
                         icon: Icons.chat_bubble_outline_rounded,
                         label: 'Écrire',
                         onTap: () => Navigator.pop(context),
                       ),
-                      _ActionChip(
+                      _RoundAction(
                         icon: Icons.search_rounded,
                         label: 'Rechercher',
                         onTap: () => Navigator.pop(context, 'search'),
                       ),
-                      _ActionChip(
+                      _RoundAction(
                         icon: Icons.notifications_off_outlined,
                         label: 'Silence',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text('Notifications locales désactivées')),
+                              content: Text('Préférence locale enregistrée'),
+                            ),
                           );
                         },
                       ),
-                      _ActionChip(
+                      _RoundAction(
                         icon: Icons.lock_outline_rounded,
                         label: 'Verrouiller',
                         onTap: () {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                                content: Text('Verrouillage local bientôt')),
+                              content: Text('Verrouillage local bientôt'),
+                            ),
                           );
                         },
                       ),
@@ -140,7 +140,8 @@ class ContactDetailScreen extends StatelessWidget {
                           label: 'Dernier échange',
                           value: lastAt == null
                               ? 'Aucun message'
-                              : '${lastAt.day}/${lastAt.month}/${lastAt.year} ${lastAt.hour.toString().padLeft(2, '0')}:${lastAt.minute.toString().padLeft(2, '0')}',
+                              : '${lastAt.day.toString().padLeft(2, '0')}/${lastAt.month.toString().padLeft(2, '0')}/${lastAt.year} '
+                                  '${lastAt.hour.toString().padLeft(2, '0')}:${lastAt.minute.toString().padLeft(2, '0')}',
                         ),
                         const Divider(height: 20),
                         const _InfoRow(
@@ -152,10 +153,8 @@ class ContactDetailScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    'Médias partagés (local)',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('Médias partagés (local)',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   GlassSurface(
                     borderRadius: BorderRadius.circular(16),
@@ -210,12 +209,12 @@ class ContactDetailScreen extends StatelessWidget {
   }
 }
 
-class _ActionChip extends StatelessWidget {
+class _RoundAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
 
-  const _ActionChip({
+  const _RoundAction({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -228,32 +227,13 @@ class _ActionChip extends StatelessWidget {
         GlassSurface(
           borderRadius: BorderRadius.circular(28),
           blur: 14,
-          child: InkWell(
-            onTap: onTap,
-            customBorder: const CircleBorder(),
-            child: const SizedBox(
-              width: 56,
-              height: 56,
-              child: Icon(Icons.circle, size: 0),
-            ),
+          child: IconButton(
+            onPressed: onTap,
+            icon: Icon(icon, color: AppColors.primary),
           ),
         ),
-        // overlay icon
-        Transform.translate(
-          offset: const Offset(0, -56),
-          child: SizedBox(
-            width: 56,
-            height: 56,
-            child: IconButton(
-              onPressed: onTap,
-              icon: Icon(icon, color: AppColors.primary),
-            ),
-          ),
-        ),
-        Transform.translate(
-          offset: const Offset(0, -56),
-          child: Text(label, style: const TextStyle(fontSize: 11)),
-        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 11)),
       ],
     );
   }
@@ -270,11 +250,13 @@ class _InfoRow extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                )),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
         const SizedBox(height: 4),
         SelectableText(value),
       ],
