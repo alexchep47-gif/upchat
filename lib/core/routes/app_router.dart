@@ -8,10 +8,10 @@ import '../../features/stories/story_viewer_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/settings/settings_screen.dart';
 import '../../features/contacts/add_contact_by_phone_screen.dart';
+import '../../features/contacts/contact_detail_screen.dart';
 import '../../features/devices/connected_devices_screen.dart';
 import '../../features/auth/login_screen.dart';
 
-/// Gestion centralisée des routes de l'application
 class AppRouter {
   static const String initialRoute = '/';
   static const String onboarding = '/onboarding';
@@ -23,6 +23,7 @@ class AppRouter {
   static const String profile = '/profile';
   static const String settings = '/settings';
   static const String addContactByPhone = '/add-contact-phone';
+  static const String contactDetail = '/contact-detail';
   static const String connectedDevices = '/connected-devices';
   static const String login = '/login';
 
@@ -40,6 +41,16 @@ class AppRouter {
         final args = routeSettings.arguments as Map<String, dynamic>?;
         return MaterialPageRoute(
           builder: (_) => ChatScreen(
+            conversationId: args?['conversationId'] as String? ?? '',
+            peerName: args?['peerName'] as String? ?? 'Contact',
+            peerId: args?['peerId'] as String? ?? '',
+          ),
+        );
+
+      case contactDetail:
+        final args = routeSettings.arguments as Map<String, dynamic>?;
+        return MaterialPageRoute(
+          builder: (_) => ContactDetailScreen(
             conversationId: args?['conversationId'] as String? ?? '',
             peerName: args?['peerName'] as String? ?? 'Contact',
             peerId: args?['peerId'] as String? ?? '',
