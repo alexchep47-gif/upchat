@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/app_colors.dart';
+import 'core/theme/app_glass.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
 import 'data/services/storage_service.dart';
@@ -18,6 +18,7 @@ import 'providers/chat_provider.dart';
 import 'providers/stories_provider.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/settings_provider.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([
@@ -28,24 +29,27 @@ void main() {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarContrastEnforced: false,
+    systemStatusBarContrastEnforced: false,
   ));
   runApp(const AppBootstrap());
 }
+
 Future<void> _initializeApp() async {
   await Hive.initFlutter();
   await StorageService.init();
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
   }
-  // Firebase est optionnel : l’initialisation locale est tentée avant runApp,
-  // mais une configuration absente ne bloque jamais le mode hors ligne.
   await FirebaseAuthService.instance.initialize();
 }
+
 class AppBootstrap extends StatefulWidget {
   const AppBootstrap({super.key});
   @override
   State<AppBootstrap> createState() => _AppBootstrapState();
 }
+
 class _AppBootstrapState extends State<AppBootstrap> {
   late Future<void> _initialization;
   @override
@@ -53,9 +57,11 @@ class _AppBootstrapState extends State<AppBootstrap> {
     super.initState();
     _initialization = _initializeApp();
   }
+
   void _retry() {
     setState(() => _initialization = _initializeApp());
   }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -72,6 +78,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
     );
   }
 }
+
 class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
   @override
@@ -99,10 +106,7 @@ class _StartupScreen extends StatelessWidget {
                     curve: Curves.easeOutBack,
                     builder: (context, scale, child) => Transform.scale(
                       scale: scale,
-                      child: FadeTransition(
-                        opacity: AlwaysStoppedAnimation<double>(scale),
-                        child: child,
-                      ),
+                      child: child,
                     ),
                     child: const _StartupLogo(),
                   ),
@@ -119,16 +123,14 @@ class _StartupScreen extends StatelessWidget {
                           color: AppColors.textPrimaryLight,
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
-                          letterSpacing: 0.4,
                         ),
                       ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 8),
                       Text(
                         'Messagerie privée',
                         style: TextStyle(
                           color: AppColors.textSecondaryLight,
                           fontSize: 13,
-                          letterSpacing: 0.3,
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -154,11 +156,13 @@ class _StartupScreen extends StatelessWidget {
     );
   }
 }
+
 class _StartupLogo extends StatelessWidget {
   const _StartupLogo();
   @override
   Widget build(BuildContext context) {
-    final size = (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(260.0, 300.0);
+    final size =
+        (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(260.0, 300.0);
     return Container(
       width: size,
       height: size,
@@ -183,10 +187,10 @@ class _StartupLogo extends StatelessWidget {
     );
   }
 }
+
 class _StartupError extends StatelessWidget {
   final Object? error;
   final VoidCallback onRetry;
-
   const _StartupError({required this.error, required this.onRetry});
 
   @override
@@ -194,7 +198,6 @@ class _StartupError extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: AppColors.backgroundLight,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
@@ -207,20 +210,13 @@ class _StartupError extends StatelessWidget {
                 const Text(
                   'Impossible de préparer UpChat',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: AppColors.textPrimaryLight,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '$error',
-                  textAlign: TextAlign.center,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondaryLight, fontSize: 12),
-                ),
+                Text('$error',
+                    textAlign: TextAlign.center,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: onRetry,
@@ -239,6 +235,19 @@ class _StartupError extends StatelessWidget {
 class UpChatApp extends StatelessWidget {
   const UpChatApp({super.key});
 
+  ThemeData _withGlass(ThemeData base, SettingsProvider settings) {
+    final glass = (base.extension<AppGlass>() ?? AppGlass.light)
+        .withBlurEnabled(!settings.lowDataMode);
+    return base.copyWith(
+      extensions: <ThemeExtension<dynamic>>[glass],
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: settings.transparentToolbar
+            ? Colors.transparent
+            : base.colorScheme.surface,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
@@ -251,46 +260,27 @@ class UpChatApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
-          final settings = context.watch<SettingsProvider>();
-          final lightTheme = AppTheme.lightTheme.copyWith(
-            appBarTheme: AppTheme.lightTheme.appBarTheme.copyWith(
-              backgroundColor: settings.transparentToolbar
-                  ? Colors.transparent
-                  : AppTheme.lightTheme.colorScheme.surface,
-            ),
-          );
-          final darkTheme = AppTheme.darkTheme.copyWith(
-            appBarTheme: AppTheme.darkTheme.appBarTheme.copyWith(
-              backgroundColor: settings.transparentToolbar
-                  ? Colors.transparent
-                  : AppTheme.darkTheme.colorScheme.surface,
-            ),
-          );
+      child: Consumer2<ThemeProvider, SettingsProvider>(
+        builder: (context, themeProvider, settings, _) {
           return MaterialApp(
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
-            theme: lightTheme,
-            darkTheme: darkTheme,
+            theme: _withGlass(AppTheme.lightTheme, settings),
+            darkTheme: _withGlass(AppTheme.darkTheme, settings),
             themeMode: themeProvider.themeMode,
             builder: (context, child) {
-              final overlayStyle =
-                  Theme.of(context).appBarTheme.systemOverlayStyle ??
-                      SystemUiOverlayStyle.dark;
-              final mediaQuery = MediaQuery.of(context);
+              final overlay = Theme.of(context).appBarTheme.systemOverlayStyle ??
+                  SystemUiOverlayStyle.dark;
               return AnnotatedRegion<SystemUiOverlayStyle>(
-                value: overlayStyle,
+                value: overlay.copyWith(
+                  systemNavigationBarContrastEnforced: false,
+                  systemStatusBarContrastEnforced: false,
+                ),
                 child: MediaQuery(
-                  data: mediaQuery.copyWith(
+                  data: MediaQuery.of(context).copyWith(
                     textScaler: TextScaler.linear(settings.chatFontScale),
                   ),
-                  child: ColoredBox(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    child: SizedBox.expand(
-                      child: child ?? const SizedBox.shrink(),
-                    ),
-                  ),
+                  child: child ?? const SizedBox.shrink(),
                 ),
               );
             },
