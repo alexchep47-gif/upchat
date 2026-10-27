@@ -1,7 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
-/// Jetons de verre pour clair / sombre / OLED.
+/// Jetons de verre — contrastes renforcés clair / sombre.
 class AppGlass extends ThemeExtension<AppGlass> {
   final double blurHeader;
   final double blurInput;
@@ -29,41 +29,43 @@ class AppGlass extends ThemeExtension<AppGlass> {
     this.enableBlur = true,
   });
 
+  /// Clair : teinte blanche semi-transparente, bordure visible, flou marqué.
   static const light = AppGlass(
-    blurHeader: 22,
-    blurInput: 20,
-    blurChip: 12,
-    blurSheet: 24,
-    tint: Color(0xB3FFFFFF),
-    border: Color(0x33FFFFFF),
-    bubbleMe: Color(0xFFDFF3FF),
-    bubbleOther: Color(0xE6FFFFFF),
-    chatGradientTop: Color(0xFFF7FBFF),
-    chatGradientBottom: Color(0xFFE3F2FD),
+    blurHeader: 28,
+    blurInput: 26,
+    blurChip: 16,
+    blurSheet: 30,
+    tint: Color(0xD9FFFFFF), // ~85% blanc
+    border: Color(0x66FFFFFF),
+    bubbleMe: Color(0xFFD6EEFF),
+    bubbleOther: Color(0xF2FFFFFF),
+    chatGradientTop: Color(0xFFEEF6FC),
+    chatGradientBottom: Color(0xFFDCEAF7),
   );
 
+  /// Sombre : teinte bleu-nuit lisible, bordure claire, flou fort.
   static const dark = AppGlass(
-    blurHeader: 22,
-    blurInput: 20,
-    blurChip: 12,
-    blurSheet: 24,
-    tint: Color(0x9917212B),
-    border: Color(0x22FFFFFF),
+    blurHeader: 28,
+    blurInput: 26,
+    blurChip: 16,
+    blurSheet: 30,
+    tint: Color(0xCC1A2734), // ~80% opaque sombre
+    border: Color(0x40FFFFFF),
     bubbleMe: Color(0xFF2B5278),
-    bubbleOther: Color(0xEB182533),
-    chatGradientTop: Color(0xFF0E1621),
-    chatGradientBottom: Color(0xFF17212B),
+    bubbleOther: Color(0xF01E2A36),
+    chatGradientTop: Color(0xFF0B141C),
+    chatGradientBottom: Color(0xFF15202B),
   );
 
   static const oled = AppGlass(
-    blurHeader: 18,
-    blurInput: 16,
-    blurChip: 10,
-    blurSheet: 20,
-    tint: Color(0xCC0A0A0A),
-    border: Color(0x1AFFFFFF),
+    blurHeader: 22,
+    blurInput: 20,
+    blurChip: 12,
+    blurSheet: 24,
+    tint: Color(0xE00A0A0A),
+    border: Color(0x33FFFFFF),
     bubbleMe: Color(0xFF1A3A5C),
-    bubbleOther: Color(0xE6121212),
+    bubbleOther: Color(0xF0121212),
     chatGradientTop: Color(0xFF000000),
     chatGradientBottom: Color(0xFF0A0A0A),
   );
@@ -112,10 +114,11 @@ class AppGlass extends ThemeExtension<AppGlass> {
       bubbleMe: Color.lerp(bubbleMe, other.bubbleMe, t) ?? bubbleMe,
       bubbleOther: Color.lerp(bubbleOther, other.bubbleOther, t) ?? bubbleOther,
       chatGradientTop:
-          Color.lerp(chatGradientTop, other.chatGradientTop, t) ?? chatGradientTop,
-      chatGradientBottom: Color.lerp(
-              chatGradientBottom, other.chatGradientBottom, t) ??
-          chatGradientBottom,
+          Color.lerp(chatGradientTop, other.chatGradientTop, t) ??
+              chatGradientTop,
+      chatGradientBottom:
+          Color.lerp(chatGradientBottom, other.chatGradientBottom, t) ??
+              chatGradientBottom,
       enableBlur: t < 0.5 ? enableBlur : other.enableBlur,
     );
   }
