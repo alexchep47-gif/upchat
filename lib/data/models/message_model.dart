@@ -11,9 +11,9 @@ class MessageModel {
   final String senderId;
   final String senderName;
   final MessageType type;
-  final String content; // texte ou chemin local du média
+  final String content;
   final String? mediaPath;
-  final int? mediaSize; // en octets
+  final int? mediaSize;
   final MessageStatus status;
   final DateTime createdAt;
   final bool isMe;
@@ -73,12 +73,14 @@ class MessageModel {
   }
 
   MessageModel copyWith({
+    String? conversationId,
     MessageStatus? status,
     String? mediaPath,
+    bool? isMe,
   }) {
     return MessageModel(
       id: id,
-      conversationId: conversationId,
+      conversationId: conversationId ?? this.conversationId,
       senderId: senderId,
       senderName: senderName,
       type: type,
@@ -87,7 +89,7 @@ class MessageModel {
       mediaSize: mediaSize,
       status: status ?? this.status,
       createdAt: createdAt,
-      isMe: isMe,
+      isMe: isMe ?? this.isMe,
     );
   }
 }
