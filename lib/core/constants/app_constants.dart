@@ -10,12 +10,11 @@ class AppConstants {
   static const String authorCredit =
       'Créé par NEMMEGNE CHEPING ALEXANDRE MERVIN\nNationalité : Camerounaise';
 
-  // Couleurs de base
-  // Legacy names kept for API compatibility; all active controls use brand blue.
-  static const int primaryGreen = 0xFF2AABEE;
-  static const int accentGreen = 0xFF2AABEE;
-  static const int lightGreen = 0xFFDFF3FF;
-  static const int darkGreen = 0xFF229ED9;
+  // Couleurs de base : palette bleue exclusivement.
+  static const int primaryBlue = 0xFF2AABEE;
+  static const int accentBlue = 0xFF2AABEE;
+  static const int lightBlue = 0xFFDFF3FF;
+  static const int darkBlue = 0xFF229ED9;
 
   // Nearby Connections
   static const String serviceId = 'com.upchat.p2p';

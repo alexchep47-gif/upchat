@@ -158,9 +158,10 @@ class _StartupLogo extends StatelessWidget {
   const _StartupLogo();
   @override
   Widget build(BuildContext context) {
+    final size = (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(260.0, 300.0);
     return Container(
-      width: 220,
-      height: 220,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: [
@@ -174,8 +175,8 @@ class _StartupLogo extends StatelessWidget {
       child: ClipOval(
         child: Image.asset(
           'assets/upchat_u_icon.png',
-          width: 220,
-          height: 220,
+          width: size,
+          height: size,
           fit: BoxFit.cover,
         ),
       ),
