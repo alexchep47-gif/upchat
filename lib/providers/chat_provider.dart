@@ -21,7 +21,7 @@ class ChatProvider extends ChangeNotifier {
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
-  final Map<String, bool> _typingUsers = {}; // userId → isTyping
+  final Map<String, bool> _typingUsers = {};
 
   List<ConversationModel> get conversations =>
       List.unmodifiable(_conversations);
@@ -44,6 +44,8 @@ class ChatProvider extends ChangeNotifier {
       _flushOfflineMessages(endpointId, userId);
     };
     _internet.onMessageReceived = _onIncomingMessage;
+    // Charge le mode internet au démarrage
+    _internet.loadPreference();
   }
 
   Future<void> _flushOfflineMessages(String endpointId, String userId) async {
@@ -137,7 +139,6 @@ class ChatProvider extends ChangeNotifier {
 
     bool success = false;
 
-    // 1. Nearby (prioritaire en local)
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
         endpointId: endpointId,
@@ -146,7 +147,6 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    // 2. Mesh offline
     if (!success) {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
@@ -155,16 +155,22 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    // 3. Internet (mode hybride)
-    if (!success && _internet.isEnabled) {
+    // Internet : tente toujours si contact téléphone connu ou mode activé
+    if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
-      success = await _internet.sendMessage(
-        targetUserId: conversationId,
-        conversationId: conversationId,
-        text: text,
-        targetPhone: phone,
-      );
+      final shouldTryNet = _internet.isEnabled || (phone != null && phone.isNotEmpty);
+      if (shouldTryNet) {
+        if (!_internet.isEnabled) {
+          await _internet.setEnabled(true);
+        }
+        success = await _internet.sendMessage(
+          targetUserId: conversationId,
+          conversationId: conversationId,
+          text: text,
+          targetPhone: phone,
+        );
+      }
     }
 
     _updateMessageStatus(
@@ -225,17 +231,20 @@ class ChatProvider extends ChangeNotifier {
         mediaPath: mediaPath,
       );
     }
-    if (!success && _internet.isEnabled) {
+    if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
-      success = await _internet.sendMessage(
-        targetUserId: conversationId,
-        conversationId: conversationId,
-        text: preview,
-        type: type,
-        mediaPath: mediaPath,
-        targetPhone: phone,
-      );
+      if (_internet.isEnabled || (phone != null && phone.isNotEmpty)) {
+        if (!_internet.isEnabled) await _internet.setEnabled(true);
+        success = await _internet.sendMessage(
+          targetUserId: conversationId,
+          conversationId: conversationId,
+          text: preview,
+          type: type,
+          mediaPath: mediaPath,
+          targetPhone: phone,
+        );
+      }
     }
 
     _updateMessageStatus(
@@ -300,17 +309,22 @@ class ChatProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
+    // Chez le destinataire, la conversation = id de l’expéditeur
+    // (pas le conversationId envoyé par l’émetteur, qui est souvent notre propre id).
+    final peerId = message.isMe ? message.conversationId : message.senderId;
+    final normalized = message.copyWith(conversationId: peerId);
+
     getOrCreateConversation(
-        peerId: message.senderId, peerName: message.senderName);
+      peerId: peerId,
+      peerName: normalized.senderName,
+    );
 
-    _messages.putIfAbsent(message.conversationId, () => []);
-    if (_messages[message.conversationId]!.any((m) => m.id == message.id))
-      return;
+    _messages.putIfAbsent(peerId, () => []);
+    if (_messages[peerId]!.any((m) => m.id == normalized.id)) return;
 
-    _messages[message.conversationId]!.add(message);
-    _updateConversationPreview(message.conversationId, message.content,
-        isIncoming: true);
-    StorageService.messages.put(message.id, message.toMap());
+    _messages[peerId]!.add(normalized);
+    _updateConversationPreview(peerId, normalized.content, isIncoming: true);
+    StorageService.messages.put(normalized.id, normalized.toMap());
     notifyListeners();
   }
 

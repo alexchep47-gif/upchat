@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 import '../../core/constants/app_constants.dart';
 
 /// Service de stockage local (Hive + Secure Storage)
-/// Gère le chiffrement AES des boîtes Hive
 class StorageService {
   static const _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -22,26 +21,18 @@ class StorageService {
   static late Box _storiesBox;
   static late Box _phoneDirectoryBox;
 
-  // Change the Web namespace when the serialized schema changes. This avoids
-  // opening legacy IndexedDB records written with unknown Hive adapters.
   static String _boxName(String name) => kIsWeb ? '${name}_web_v2' : name;
 
-  /// Initialisation au démarrage de l'app
   static Future<void> init() async {
-    // flutter_secure_storage peut attendre indéfiniment dans certains
-    // navigateurs. Le Web utilise une boîte Hive locale pour conserver la
-    // clé de chiffrement, tandis qu'Android/iOS gardent le stockage natif.
     if (kIsWeb) {
       _settingsBox = await Hive.openBox(_boxName('settings'));
     }
 
-    // Récupère ou génère la clé de chiffrement
     String? encryptionKey = kIsWeb
         ? _settingsBox.get(AppConstants.keyEncryptionKey) as String?
         : await _secureStorage.read(key: AppConstants.keyEncryptionKey);
 
     if (encryptionKey == null) {
-      // Première installation → génère une clé AES 256 bits
       final key = base64Url.encode(
         List<int>.generate(32, (_) => Random.secure().nextInt(256)),
       );
@@ -57,7 +48,6 @@ class StorageService {
     final keyBytes = base64Url.decode(encryptionKey);
     final HiveCipher? webSafeCipher = kIsWeb ? null : HiveAesCipher(keyBytes);
 
-    // Ouvre les boîtes Hive (chiffrées pour les données sensibles)
     if (!kIsWeb) {
       _settingsBox = await Hive.openBox(_boxName('settings'));
     }
@@ -66,17 +56,19 @@ class StorageService {
       encryptionCipher: webSafeCipher,
     );
     await _migrateSensitiveSettings();
-    _usersBox = await Hive.openBox(_boxName('users'), encryptionCipher: webSafeCipher);
+    _usersBox =
+        await Hive.openBox(_boxName('users'), encryptionCipher: webSafeCipher);
     _conversationsBox = await Hive.openBox(_boxName('conversations'),
         encryptionCipher: webSafeCipher);
-    _messagesBox =
-        await Hive.openBox(_boxName('messages'), encryptionCipher: webSafeCipher);
-    _groupsBox = await Hive.openBox(_boxName('groups'), encryptionCipher: webSafeCipher);
-    _storiesBox = await Hive.openBox(_boxName('stories'), encryptionCipher: webSafeCipher);
+    _messagesBox = await Hive.openBox(_boxName('messages'),
+        encryptionCipher: webSafeCipher);
+    _groupsBox =
+        await Hive.openBox(_boxName('groups'), encryptionCipher: webSafeCipher);
+    _storiesBox =
+        await Hive.openBox(_boxName('stories'), encryptionCipher: webSafeCipher);
     _phoneDirectoryBox = await Hive.openBox(_boxName('phone_directory'),
         encryptionCipher: webSafeCipher);
 
-    // Crée un ID utilisateur local s'il n'existe pas
     if (_secureSettingsBox.get(AppConstants.keyUserId) == null) {
       final userId = const Uuid().v4();
       await _secureSettingsBox.put(AppConstants.keyUserId, userId);
@@ -108,7 +100,6 @@ class StorageService {
     }
   }
 
-  // ─── Getters des boîtes ───────────────────────────────────
   static Box get settings => _settingsBox;
   static Box get users => _usersBox;
   static Box get conversations => _conversationsBox;
@@ -117,17 +108,21 @@ class StorageService {
   static Box get stories => _storiesBox;
   static Box get phoneDirectory => _phoneDirectoryBox;
 
-  // ─── Helpers settings ─────────────────────────────────────
   static String get userId =>
       _secureSettingsBox.get(AppConstants.keyUserId) as String;
+
+  /// Aligne l’ID local avec Firebase Auth (obligatoire pour le relais internet).
+  static Future<void> setUserId(String id) async {
+    if (id.trim().isEmpty) return;
+    await _secureSettingsBox.put(AppConstants.keyUserId, id.trim());
+  }
 
   static String get deviceSecret =>
       _secureSettingsBox.get(AppConstants.keyDeviceSecret) as String;
 
   static String get userName =>
       _secureSettingsBox
-          .get(AppConstants.keyUserName, defaultValue: 'Utilisateur')
-          as String;
+          .get(AppConstants.keyUserName, defaultValue: 'Utilisateur') as String;
 
   static Future<void> setUserName(String name) async {
     await _secureSettingsBox.put(AppConstants.keyUserName, name);
@@ -147,7 +142,6 @@ class StorageService {
     await _secureSettingsBox.put(AppConstants.keyUserPhoto, path);
   }
 
-  /// Numéro de téléphone (digits, sans espaces) — utilisé pour le mode internet
   static String? get userPhone =>
       _secureSettingsBox.get(AppConstants.keyUserPhone) as String?;
 
@@ -156,7 +150,6 @@ class StorageService {
     await _secureSettingsBox.put(AppConstants.keyUserPhone, normalized);
   }
 
-  /// Normalise un numéro : ne garde que les chiffres et le + initial
   static String normalizePhone(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return '';
@@ -188,20 +181,19 @@ class StorageService {
     await _settingsBox.put(AppConstants.keyAutoPlayStories, value);
   }
 
-  static int get storyViewDuration => _settingsBox
-      .get(AppConstants.keyStoryViewDuration, defaultValue: 5) as int;
+  static int get storyViewDuration =>
+      _settingsBox.get(AppConstants.keyStoryViewDuration, defaultValue: 5)
+          as int;
 
   static Future<void> setStoryViewDuration(int seconds) async {
     await _settingsBox.put(AppConstants.keyStoryViewDuration, seconds);
   }
 
-  /// Efface toutes les discussions (messages + conversations)
   static Future<void> clearChats() async {
     await _messagesBox.clear();
     await _conversationsBox.clear();
   }
 
-  /// Ferme proprement les boîtes (appelé rarement)
   static Future<void> close() async {
     await Hive.close();
   }
