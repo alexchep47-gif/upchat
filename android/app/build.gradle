@@ -6,8 +6,9 @@ plugins {
 
 android {
     namespace = "com.upchat.app"
-    compileSdk = 35
-    ndkVersion = flutter.ndkVersion
+    compileSdk = 36
+    // Version demandée par les plugins Firebase, Nearby et image_picker.
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -22,7 +23,7 @@ android {
         applicationId = "com.upchat.app"
         // Android 9 (API 28) is the supported compatibility floor.
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

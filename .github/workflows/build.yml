@@ -24,8 +24,13 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.47.8'
           channel: 'stable'
+
+      - name: Install required Android NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;28.2.13676358"
 
       - name: Inject Firebase Flutter options
         env:
@@ -147,7 +152,7 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
+          flutter-version: '3.47.8'
           channel: 'stable'
 
       - name: Inject Firebase Flutter options (web)

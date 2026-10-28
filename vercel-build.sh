@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
-FLUTTER_DIR=/tmp/flutter
+FLUTTER_DIR=/tmp/flutter-3.47.8
 if [ ! -x "$FLUTTER_DIR/bin/flutter" ]; then
   rm -rf "$FLUTTER_DIR"
-  git clone https://github.com/flutter/flutter.git -b 3.24.5 --depth 1 "$FLUTTER_DIR"
+  git clone https://github.com/flutter/flutter.git -b 3.47.8 --depth 1 "$FLUTTER_DIR"
 fi
 export PATH="$FLUTTER_DIR/bin:$PATH"
 flutter --version
