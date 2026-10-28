@@ -27,13 +27,10 @@ jobs:
           flutter-version: '3.47.8'
           channel: 'stable'
 
-      - name: Set up Android SDK command-line tools
-        uses: android-actions/setup-android@v3
-
       - name: Install required Android NDK
         run: |
-          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then SDKMANAGER="sdkmanager"; fi
+          SDKMANAGER=$(find "${ANDROID_HOME}/cmdline-tools" -type f -name sdkmanager -perm -u+x | head -1)
+          if [ -z "$SDKMANAGER" ]; then echo "sdkmanager introuvable dans ${ANDROID_HOME}"; exit 1; fi
           yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
           "$SDKMANAGER" "platforms;android-36" "build-tools;35.0.0" "ndk;28.2.13676358"
 
