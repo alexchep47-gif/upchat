@@ -28,15 +28,15 @@ void main() {
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
     systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
     systemNavigationBarContrastEnforced: false,
     systemStatusBarContrastEnforced: false,
   ));
   runApp(const AppBootstrap());
 }
 
-/// Initialise uniquement le stockage local (obligatoire).
-/// Firebase est optionnel et ne bloque jamais le démarrage.
 Future<void> _initializeLocalOnly() async {
   await Hive.initFlutter();
   await StorageService.init();
@@ -45,15 +45,12 @@ Future<void> _initializeLocalOnly() async {
   }
 }
 
-/// Tente Firebase en arrière-plan (timeout court, erreurs ignorées).
 Future<void> _warmUpFirebaseInBackground() async {
   try {
     await FirebaseAuthService.instance
         .initialize()
         .timeout(const Duration(seconds: 8));
-  } catch (_) {
-    // Hors ligne / config absente / réseau lent : OK.
-  }
+  } catch (_) {}
 }
 
 class AppBootstrap extends StatefulWidget {
@@ -72,9 +69,7 @@ class _AppBootstrapState extends State<AppBootstrap> {
   }
 
   Future<void> _bootstrap() async {
-    // Chemin critique : stockage local uniquement.
     await _initializeLocalOnly();
-    // Firebase en best-effort, ne doit pas faire échouer le Future.
     unawaited(_warmUpFirebaseInBackground());
   }
 
@@ -83,8 +78,6 @@ class _AppBootstrapState extends State<AppBootstrap> {
   }
 
   void _continueOffline() {
-    // Force l’affichage de l’app même si l’init locale a échoué une fois
-    // (cas extrême). L’utilisateur peut au moins ouvrir l’UI.
     setState(() {
       _initialization = Future<void>.value();
     });
@@ -111,110 +104,163 @@ class _AppBootstrapState extends State<AppBootstrap> {
   }
 }
 
+/// Splash aligné sur la capture Adalo : fond bleu nuit, carte verre, bulle + flèche.
 class _StartupScreen extends StatelessWidget {
   const _StartupScreen();
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
-        backgroundColor: AppColors.backgroundLight,
         body: DecoratedBox(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [Color(0xFFF7FBFF), Color(0xFFE7F5FF)],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF1565C0),
+                Color(0xFF0D47A1),
+                Color(0xFF061428),
+              ],
+              stops: [0.0, 0.45, 1.0],
             ),
           ),
-          child: SafeArea(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Center(
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.82, end: 1),
-                    duration: const Duration(milliseconds: 800),
-                    curve: Curves.easeOutBack,
-                    builder: (context, scale, child) => Transform.scale(
-                      scale: scale,
-                      child: child,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Points décoratifs
+              ..._dots(),
+              SafeArea(
+                child: Column(
+                  children: [
+                    const Spacer(flex: 3),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.85, end: 1),
+                      duration: const Duration(milliseconds: 900),
+                      curve: Curves.easeOutBack,
+                      builder: (context, scale, child) => Transform.scale(
+                        scale: scale,
+                        child: child,
+                      ),
+                      child: const _BrandCard(),
                     ),
-                    child: const _StartupLogo(),
-                  ),
+                    const SizedBox(height: 28),
+                    const Text(
+                      'UpChat',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const Spacer(flex: 4),
+                    const SizedBox(
+                      width: 120,
+                      child: LinearProgressIndicator(
+                        minHeight: 3,
+                        backgroundColor: Color(0x33FFFFFF),
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Messagerie privée',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.7),
+                        fontSize: 13,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 36),
+                  ],
                 ),
-                Positioned(
-                  left: 24,
-                  right: 24,
-                  bottom: 32,
-                  child: Column(
-                    children: [
-                      const Text(
-                        'UpChat',
-                        style: TextStyle(
-                          color: AppColors.textPrimaryLight,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Messagerie privée — mode local',
-                        style: TextStyle(
-                          color: AppColors.textSecondaryLight,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: 116,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: const LinearProgressIndicator(
-                            minHeight: 3,
-                            backgroundColor: Color(0x332AABEE),
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
+  static List<Widget> _dots() {
+    const positions = <Offset>[
+      Offset(0.12, 0.18),
+      Offset(0.82, 0.22),
+      Offset(0.22, 0.55),
+      Offset(0.88, 0.48),
+      Offset(0.15, 0.78),
+      Offset(0.75, 0.72),
+    ];
+    return [
+      for (final p in positions)
+        Align(
+          alignment: Alignment(p.dx * 2 - 1, p.dy * 2 - 1),
+          child: Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.25),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+    ];
+  }
 }
 
-class _StartupLogo extends StatelessWidget {
-  const _StartupLogo();
+class _BrandCard extends StatelessWidget {
+  const _BrandCard();
+
   @override
   Widget build(BuildContext context) {
-    final size =
-        (MediaQuery.sizeOf(context).shortestSide * 0.72).clamp(260.0, 300.0);
     return Container(
-      width: size,
-      height: size,
+      width: 168,
+      height: 168,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
+        color: const Color(0xFF0A1628).withOpacity(0.55),
+        borderRadius: BorderRadius.circular(36),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.28),
-            blurRadius: 34,
-            spreadRadius: 5,
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: ClipOval(
-        child: Image.asset(
-          'assets/upchat_u_icon.png',
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-        ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 88,
+            height: 88,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1E88E5),
+              shape: BoxShape.circle,
+            ),
+            child: const Stack(
+              alignment: Alignment.center,
+              children: [
+                // Contour type bulle (léger décalage bas-gauche pour « queue »)
+                Icon(Icons.chat_bubble_rounded,
+                    color: Color(0xFF1565C0), size: 72),
+                Icon(Icons.arrow_upward_rounded,
+                    color: Color(0xFF0A1628), size: 36),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'UpChat',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -236,6 +282,7 @@ class _StartupError extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
+        backgroundColor: const Color(0xFF061428),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
@@ -243,12 +290,16 @@ class _StartupError extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.cloud_off_rounded,
-                    color: AppColors.primary, size: 48),
+                    color: Color(0xFF42A5F5), size: 48),
                 const SizedBox(height: 16),
                 const Text(
                   'Préparation locale interrompue',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -256,14 +307,16 @@ class _StartupError extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 4,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.7), fontSize: 13),
                 ),
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Firebase n’est pas requis pour démarrer.\n'
                   'Tu peux continuer en mode hors ligne.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Colors.black54),
+                  style: TextStyle(
+                      color: Colors.white.withOpacity(0.55), fontSize: 13),
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
@@ -276,6 +329,7 @@ class _StartupError extends StatelessWidget {
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Réessayer'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.white70),
                 ),
               ],
             ),
@@ -324,7 +378,7 @@ class UpChatApp extends StatelessWidget {
             themeMode: themeProvider.themeMode,
             builder: (context, child) {
               final overlay = Theme.of(context).appBarTheme.systemOverlayStyle ??
-                  SystemUiOverlayStyle.dark;
+                  SystemUiOverlayStyle.light;
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: overlay.copyWith(
                   systemNavigationBarContrastEnforced: false,
