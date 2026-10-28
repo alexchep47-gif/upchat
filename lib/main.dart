@@ -35,13 +35,25 @@ void main() {
   runApp(const AppBootstrap());
 }
 
-Future<void> _initializeApp() async {
+/// Initialise uniquement le stockage local (obligatoire).
+/// Firebase est optionnel et ne bloque jamais le démarrage.
+Future<void> _initializeLocalOnly() async {
   await Hive.initFlutter();
   await StorageService.init();
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
   }
-  await FirebaseAuthService.instance.initialize();
+}
+
+/// Tente Firebase en arrière-plan (timeout court, erreurs ignorées).
+Future<void> _warmUpFirebaseInBackground() async {
+  try {
+    await FirebaseAuthService.instance
+        .initialize()
+        .timeout(const Duration(seconds: 8));
+  } catch (_) {
+    // Hors ligne / config absente / réseau lent : OK.
+  }
 }
 
 class AppBootstrap extends StatefulWidget {
@@ -52,14 +64,30 @@ class AppBootstrap extends StatefulWidget {
 
 class _AppBootstrapState extends State<AppBootstrap> {
   late Future<void> _initialization;
+
   @override
   void initState() {
     super.initState();
-    _initialization = _initializeApp();
+    _initialization = _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    // Chemin critique : stockage local uniquement.
+    await _initializeLocalOnly();
+    // Firebase en best-effort, ne doit pas faire échouer le Future.
+    unawaited(_warmUpFirebaseInBackground());
   }
 
   void _retry() {
-    setState(() => _initialization = _initializeApp());
+    setState(() => _initialization = _bootstrap());
+  }
+
+  void _continueOffline() {
+    // Force l’affichage de l’app même si l’init locale a échoué une fois
+    // (cas extrême). L’utilisateur peut au moins ouvrir l’UI.
+    setState(() {
+      _initialization = Future<void>.value();
+    });
   }
 
   @override
@@ -71,7 +99,11 @@ class _AppBootstrapState extends State<AppBootstrap> {
           return const _StartupScreen();
         }
         if (snapshot.hasError) {
-          return _StartupError(error: snapshot.error, onRetry: _retry);
+          return _StartupError(
+            error: snapshot.error,
+            onRetry: _retry,
+            onContinueOffline: _continueOffline,
+          );
         }
         return const UpChatApp();
       },
@@ -127,7 +159,7 @@ class _StartupScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Messagerie privée',
+                        'Messagerie privée — mode local',
                         style: TextStyle(
                           color: AppColors.textSecondaryLight,
                           fontSize: 13,
@@ -191,7 +223,13 @@ class _StartupLogo extends StatelessWidget {
 class _StartupError extends StatelessWidget {
   final Object? error;
   final VoidCallback onRetry;
-  const _StartupError({required this.error, required this.onRetry});
+  final VoidCallback onContinueOffline;
+
+  const _StartupError({
+    required this.error,
+    required this.onRetry,
+    required this.onContinueOffline,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -208,17 +246,33 @@ class _StartupError extends StatelessWidget {
                     color: AppColors.primary, size: 48),
                 const SizedBox(height: 16),
                 const Text(
-                  'Impossible de préparer UpChat',
+                  'Préparation locale interrompue',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
-                Text('$error',
-                    textAlign: TextAlign.center,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  '$error',
+                  textAlign: TextAlign.center,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Firebase n’est pas requis pour démarrer.\n'
+                  'Tu peux continuer en mode hors ligne.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: Colors.black54),
+                ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
+                  onPressed: onContinueOffline,
+                  icon: const Icon(Icons.wifi_off_rounded),
+                  label: const Text('Continuer hors ligne'),
+                ),
+                const SizedBox(height: 10),
+                TextButton.icon(
                   onPressed: onRetry,
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('Réessayer'),
