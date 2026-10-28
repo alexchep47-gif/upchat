@@ -34,6 +34,7 @@ class InternetService {
   Timer? _inboxTimer;
   bool _flushInProgress = false;
   bool _inboxPullInProgress = false;
+  Future<bool>? _reconnectFuture;
 
   // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
@@ -172,6 +173,28 @@ class InternetService {
     });
   }
 
+  /// Ré-authentifie une session expirée sans lancer plusieurs reconnexions
+  /// concurrentes.
+  Future<bool> _reconnectSignaling() {
+    final active = _reconnectFuture;
+    if (active != null) return active;
+
+    final future = () async {
+      _isConnectedToSignaling = false;
+      await _connectSignaling();
+      if (!_isConnectedToSignaling) return false;
+
+      _isOnline = true;
+      onConnectivityChanged?.call(true);
+      _startHeartbeat();
+      _startInboxPolling();
+      return true;
+    }();
+
+    _reconnectFuture = future.whenComplete(() => _reconnectFuture = null);
+    return _reconnectFuture!;
+  }
+
   void _startInboxPolling() {
     _inboxTimer?.cancel();
     _inboxTimer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -180,7 +203,7 @@ class InternetService {
     _pullInbox();
   }
 
-  Future<void> _pullInbox() async {
+  Future<void> _pullInbox({bool retryAfterAuth = true}) async {
     if (_inboxPullInProgress || !_enabled || !_isOnline || !_isConnectedToSignaling) {
       return;
     }
@@ -191,6 +214,9 @@ class InternetService {
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 401) {
         _isConnectedToSignaling = false;
+        if (retryAfterAuth && await _reconnectSignaling()) {
+          await _pullInbox(retryAfterAuth: false);
+        }
         return;
       }
       if (res.statusCode != 200) return;
@@ -314,7 +340,10 @@ class InternetService {
     return await _transmit(payload);
   }
 
-  Future<bool> _transmit(Map<String, dynamic> payload) async {
+  Future<bool> _transmit(
+    Map<String, dynamic> payload, {
+    bool retryAfterAuth = true,
+  }) async {
     try {
       final res = await http
           .post(
@@ -329,6 +358,11 @@ class InternetService {
         return true;
       }
       debugPrint('InternetService: transmit HTTP ${res.statusCode}');
+      if (res.statusCode == 401 &&
+          retryAfterAuth &&
+          await _reconnectSignaling()) {
+        return _transmit(payload, retryAfterAuth: false);
+      }
       if (res.statusCode >= 400 && res.statusCode < 500 &&
           res.statusCode != 408 && res.statusCode != 425 && res.statusCode != 429) {
         return false;
@@ -361,6 +395,10 @@ class InternetService {
         final ok = await _transmit(payload);
         if (ok) {
           await StorageService.messages.delete('outbox_${payload['id']}');
+        } else if (!_outbox.any((item) => item['id'] == payload['id'])) {
+          // Ne pas perdre le message si le relais refuse temporairement
+          // la session ou si la reconnexion échoue.
+          _outbox.add(payload);
         }
       }
     } finally {

@@ -779,28 +779,37 @@ class _StatusIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     IconData icon;
     Color color;
+    String label;
     switch (status) {
       case MessageStatus.sending:
         icon = Icons.schedule_rounded;
         color = isDark ? Colors.white30 : Colors.black26;
+        label = 'Message en attente d’envoi';
         break;
       case MessageStatus.sent:
         icon = Icons.done_rounded;
         color = isDark ? Colors.white54 : Colors.black38;
+        label = 'Message accepté par le relais';
         break;
       case MessageStatus.delivered:
         icon = Icons.done_all_rounded;
         color = isDark ? Colors.white54 : Colors.black38;
+        label = 'Message livré';
         break;
       case MessageStatus.read:
         icon = Icons.done_all_rounded;
         color = AppColors.primary; // bleu, jamais vert
+        label = 'Message lu';
         break;
       case MessageStatus.failed:
         icon = Icons.error_outline_rounded;
         color = Colors.redAccent;
+        label = 'Échec de l’envoi';
         break;
     }
-    return Icon(icon, size: 15, color: color);
+    return Semantics(
+      label: label,
+      child: Icon(icon, size: 15, color: color),
+    );
   }
 }
