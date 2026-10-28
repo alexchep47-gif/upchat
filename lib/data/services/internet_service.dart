@@ -284,7 +284,7 @@ class InternetService {
       } else if (res.statusCode == 401) {
         await _connectSignaling();
         if (_isConnectedToSignaling) {
-          return lookupByPhone(phone, requireRegisteredAccount: requireRegisteredAccount);
+          return await lookupByPhone(phone, requireRegisteredAccount: requireRegisteredAccount);
         }
       } else if (res.statusCode >= 500) {
         throw StateError('Le serveur UpChat est temporairement indisponible.');
@@ -361,7 +361,7 @@ class InternetService {
       if (res.statusCode == 401 &&
           retryAfterAuth &&
           await _reconnectSignaling()) {
-        return _transmit(payload, retryAfterAuth: false);
+        return await _transmit(payload, retryAfterAuth: false);
       }
       if (res.statusCode >= 400 && res.statusCode < 500 &&
           res.statusCode != 408 && res.statusCode != 425 && res.statusCode != 429) {
