@@ -8,7 +8,8 @@ import '../../data/services/storage_service.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/glass_container.dart';
 
-/// Parcours de premier lancement adaptatif : bienvenue, accès système, profil.
+/// Parcours premier lancement — page d’accueil inspirée Adalo (dark + CTA dégradé),
+/// puis permissions et profil (logique Flutter UpChat inchangée).
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -112,66 +113,229 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWelcome = _currentPage == 0;
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor:
+          isWelcome ? const Color(0xFF0B1220) : Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final maxWidth = constraints.maxWidth >= 900 ? 760.0 : 640.0;
-            return Column(
-              children: [
-                _OnboardingHeader(page: _currentPage),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(),
-                    onPageChanged: (page) {
-                      setState(() => _currentPage = page);
-                      if (page == 1) _refreshPermissions();
-                    },
-                    children: [
-                      _pageShell(maxWidth, _welcomePage()),
-                      _pageShell(maxWidth, _permissionsPage()),
-                      _pageShell(maxWidth, _profilePage()),
-                    ],
-                  ),
-                ),
-                _PageIndicator(currentPage: _currentPage),
-              ],
-            );
-          },
+        child: Column(
+          children: [
+            if (!isWelcome) _OnboardingHeader(page: _currentPage),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                onPageChanged: (page) {
+                  setState(() => _currentPage = page);
+                  if (page == 1) _refreshPermissions();
+                },
+                children: [
+                  _welcomeAdaloPage(),
+                  _pageShell(_permissionsPage()),
+                  _pageShell(_profilePage()),
+                ],
+              ),
+            ),
+            if (!isWelcome) _PageIndicator(currentPage: _currentPage),
+          ],
         ),
       ),
     );
   }
 
-  Widget _pageShell(double maxWidth, Widget child) {
+  Widget _pageShell(Widget child) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
+          constraints: const BoxConstraints(maxWidth: 640),
           child: child,
         ),
       ),
     );
   }
 
-  Widget _welcomePage() {
-    return _ContentCard(
-      icon: Icons.forum_rounded,
-      title: 'Bienvenue sur UpChat',
-      subtitle:
-          'Une messagerie qui s’adapte à ton réseau : proximité par Bluetooth et Wi‑Fi Direct, ou mode internet lorsque tu l’actives.',
-      child: Column(
-        children: [
-          _PrimaryButton(label: 'Continuer', onPressed: _nextPage),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => Navigator.pushNamed(context, AppRouter.login),
-            child: const Text('Se connecter à un compte'),
+  /// Écran d’accueil type Adalo : badge live, pastilles features, CTA dégradé.
+  Widget _welcomeAdaloPage() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(28, 36, 28, 28),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            children: [
+              const SizedBox(height: 24),
+              // Bulles dégradées
+              SizedBox(
+                height: 120,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Positioned(
+                      left: 48,
+                      child: Container(
+                        width: 88,
+                        height: 88,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF5B8CFF), Color(0xFFB06BFF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Icon(Icons.more_horiz,
+                            color: Colors.white, size: 36),
+                      ),
+                    ),
+                    Positioned(
+                      right: 52,
+                      top: 8,
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF7B5CFF), Color(0xFF2AABEE)],
+                          ),
+                          border: Border.all(
+                              color: const Color(0xFF0B1220), width: 4),
+                        ),
+                        child: const Icon(Icons.chat_bubble_rounded,
+                            color: Colors.white, size: 28),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A2438),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF2A3A55)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, size: 8, color: Color(0xFF4ADE80)),
+                    SizedBox(width: 8),
+                    Text(
+                      'MESSAGERIE LIVE',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Text(
+                'UpChat',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 42,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Envoie un message, vois les points de présence.\n'
+                'En tête-à-tête ou en groupe — photos, proximité\n'
+                'et non-lus qui comptent vraiment.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF9AA8C0),
+                  fontSize: 15,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 28),
+              _FeatureChip(
+                icon: Icons.chat_bubble_outline_rounded,
+                color: const Color(0xFF5B8CFF),
+                label: 'Discussions qui te suivent',
+              ),
+              const SizedBox(height: 10),
+              _FeatureChip(
+                icon: Icons.groups_rounded,
+                color: const Color(0xFFB06BFF),
+                label: 'Fils de groupe pour tes proches',
+              ),
+              const SizedBox(height: 10),
+              _FeatureChip(
+                icon: Icons.wifi_tethering_rounded,
+                color: const Color(0xFF2AABEE),
+                label: 'Voir qui est autour, maintenant',
+              ),
+              const SizedBox(height: 32),
+              // CTA dégradé style Adalo
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF3B82F6), Color(0xFFA855F7)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF3B82F6).withOpacity(0.35),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(28),
+                      onTap: _nextPage,
+                      child: const Center(
+                        child: Text(
+                          'Commencer à discuter  →',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () =>
+                    Navigator.pushNamed(context, AppRouter.login),
+                child: const Text.rich(
+                  TextSpan(
+                    text: 'Déjà un compte ? ',
+                    style: TextStyle(color: Color(0xFF9AA8C0)),
+                    children: [
+                      TextSpan(
+                        text: 'Se connecter',
+                        style: TextStyle(
+                          color: Color(0xFF7BB8FF),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -184,7 +348,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.bluetooth_searching_rounded,
       title: 'Autoriser la proximité',
       subtitle:
-          'UpChat doit demander les autorisations système pour découvrir les appareils proches. L’état ci-dessous vient réellement du téléphone.',
+          'UpChat demande les autorisations pour découvrir les appareils proches. L’état ci-dessous vient du téléphone.',
       child: Column(
         children: [
           _PermissionTile(
@@ -258,7 +422,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.person_rounded,
       title: 'Créer ton profil',
       subtitle:
-          'Le nom est visible par tes contacts. Le numéro est facultatif et sert uniquement à être trouvé en mode internet.',
+          'Le nom est visible par tes contacts. Le numéro est facultatif et sert à être trouvé en mode internet.',
       child: Column(
         children: [
           TextField(
@@ -285,6 +449,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             label: 'Commencer',
             icon: Icons.arrow_forward_rounded,
             onPressed: _finish,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureChip extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+
+  const _FeatureChip({
+    required this.icon,
+    required this.color,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141C2E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF243049)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
@@ -324,7 +529,9 @@ class _OnboardingHeader extends StatelessWidget {
           ),
           Text(
             '${page + 1}/3',
-            style: const TextStyle(color: AppColors.textSecondaryDark),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -409,7 +616,7 @@ class _PermissionTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.14),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -421,12 +628,14 @@ class _PermissionTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w700)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w700)),
                 const SizedBox(height: 3),
                 Text(value,
-                    style: const TextStyle(
-                        color: AppColors.textSecondaryDark, fontSize: 13)),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13)),
               ],
             ),
           ),
@@ -471,7 +680,7 @@ class _PrimaryButton extends StatelessWidget {
             : Icon(icon ?? Icons.arrow_forward_rounded),
         label: Text(label),
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.accent,
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 15),
           shape: RoundedRectangleBorder(
@@ -502,7 +711,7 @@ class _PageIndicator extends StatelessWidget {
             decoration: BoxDecoration(
               color: currentPage == index
                   ? AppColors.primary
-                  : Colors.white.withOpacity(0.2),
+                  : Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
               borderRadius: BorderRadius.circular(4),
             ),
           );
