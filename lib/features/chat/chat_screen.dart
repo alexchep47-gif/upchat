@@ -214,7 +214,8 @@ class _ChatScreenState extends State<ChatScreen> {
     final media = MediaQuery.of(context);
     final bottomInset = media.viewInsets.bottom;
     final bottomSafe = media.viewPadding.bottom;
-    // Clavier ouvert : viewInsets seul. Sinon : marge système (gestes / home indicator).
+    // Le Scaffold ne redimensionne pas le body : les viewInsets déplacent donc
+    // la saisie une seule fois, y compris lorsque le clavier Safari s’anime.
     final inputBottomPad =
         bottomInset > 0 ? bottomInset : (bottomSafe > 0 ? bottomSafe : 8.0);
 
@@ -239,6 +240,7 @@ class _ChatScreenState extends State<ChatScreen> {
         systemNavigationBarContrastEnforced: false,
       ),
       child: Scaffold(
+        resizeToAvoidBottomInset: false,
         backgroundColor: glass.chatGradientTop,
         extendBody: true,
         extendBodyBehindAppBar: true,
@@ -257,7 +259,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: visible.isEmpty
                     ? Padding(
                         padding: EdgeInsets.only(
-                          top: media.padding.top + 72,
+                          top: media.padding.top + 12,
                           bottom: 120 + inputBottomPad,
                         ),
                         child: const EmptyState(
@@ -272,7 +274,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         padding: EdgeInsets.only(
                           left: 10,
                           right: 10,
-                          top: media.padding.top + 72,
+                          top: media.padding.top + 12,
                           bottom: 120 + inputBottomPad,
                         ),
                         itemCount: visible.length,
@@ -495,7 +497,9 @@ class _ChatScreenState extends State<ChatScreen> {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                child: Padding(
+                child: AnimatedPadding(
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
                   padding: EdgeInsets.only(bottom: inputBottomPad),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

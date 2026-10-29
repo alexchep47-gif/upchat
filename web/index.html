@@ -19,12 +19,14 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="UpChat — messagerie P2P offline + mode internet par numéro.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="UpChat">
-  <meta name="theme-color" content="#128C7E">
+  <meta name="theme-color" media="(prefers-color-scheme: light)" content="#EEF6FC">
+  <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B141C">
   <link rel="apple-touch-icon" href="icons/upchat-192.png">
 
   <!-- Favicon -->
@@ -34,13 +36,18 @@
   <title>UpChat</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    :root { color-scheme: dark; background: #0f141b; }
+    :root { color-scheme: light dark; background: #EEF6FC; }
     html, body {
       margin: 0;
       width: 100%;
-      min-height: 100%;
-      background: #0f141b;
+      height: 100%;
+      height: 100dvh;
+      background: #EEF6FC;
       overflow: hidden;
+    }
+    body { position: fixed; left: 0; right: 0; top: 0; }
+    @media (prefers-color-scheme: dark) {
+      :root, html, body { background: #0B141C; }
     }
     #upchat-loading {
       position: fixed;
@@ -116,6 +123,22 @@
   </div>
   <script src="flutter_bootstrap.js" async></script>
   <script>
+    (function () {
+      var root = document.documentElement;
+      var body = document.body;
+      var viewport = window.visualViewport;
+      if (!viewport) return;
+      var syncViewport = function () {
+        var height = Math.max(1, Math.round(viewport.height));
+        root.style.height = height + 'px';
+        body.style.height = height + 'px';
+        body.style.top = Math.round(viewport.offsetTop) + 'px';
+        window.scrollTo(0, 0);
+      };
+      viewport.addEventListener('resize', syncViewport, { passive: true });
+      viewport.addEventListener('scroll', syncViewport, { passive: true });
+      syncViewport();
+    })();
     (function () {
       var loader = document.getElementById('upchat-loading');
       var hide = function () { if (loader) loader.classList.add('is-hidden'); };

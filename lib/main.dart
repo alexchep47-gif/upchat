@@ -8,6 +8,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_glass.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
+import 'core/utils/web_theme_color.dart';
 import 'data/services/storage_service.dart';
 import 'data/services/firebase_auth_service.dart';
 import 'data/services/cleanup_service.dart';
@@ -377,6 +378,10 @@ class UpChatApp extends StatelessWidget {
             darkTheme: _withGlass(AppTheme.darkTheme, settings),
             themeMode: themeProvider.themeMode,
             builder: (context, child) {
+              final activeTheme = Theme.of(context);
+              final activeGlass =
+                  activeTheme.extension<AppGlass>() ?? AppGlass.light;
+              setWebThemeColor(activeGlass.chatGradientTop);
               final overlay = Theme.of(context).appBarTheme.systemOverlayStyle ??
                   SystemUiOverlayStyle.light;
               return AnnotatedRegion<SystemUiOverlayStyle>(
