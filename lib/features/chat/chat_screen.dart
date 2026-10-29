@@ -223,8 +223,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final visible = _searchQuery.trim().isEmpty
         ? messages
         : messages
-            .where((m) =>
-                m.content.toLowerCase().contains(_searchQuery.trim().toLowerCase()))
+            .where((m) => m.content
+                .toLowerCase()
+                .contains(_searchQuery.trim().toLowerCase()))
             .toList();
     final peerTyping = chat.isTyping(widget.peerId);
     final forceOpaque = settings.lowDataMode || !glass.enableBlur;
@@ -232,8 +233,9 @@ class _ChatScreenState extends State<ChatScreen> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
-        statusBarIconBrightness:
-            isDark ? Brightness.light : Brightness.dark,
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+        systemStatusBarContrastEnforced: false,
         systemNavigationBarColor: Colors.transparent,
         systemNavigationBarIconBrightness:
             isDark ? Brightness.light : Brightness.dark,
@@ -509,8 +511,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           height: 44,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
                             itemCount: _quickEmojis.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(width: 6),
@@ -566,8 +567,8 @@ class _ChatScreenState extends State<ChatScreen> {
                                 ),
                               ),
                               Padding(
-                                padding: const EdgeInsets.only(
-                                    right: 4, bottom: 2),
+                                padding:
+                                    const EdgeInsets.only(right: 4, bottom: 2),
                                 child: Material(
                                   color: AppColors.primary,
                                   shape: const CircleBorder(),
@@ -725,9 +726,8 @@ class _MessageBubble extends StatelessWidget {
                       Text(
                         message.content,
                         style: TextStyle(
-                          color: isDark
-                              ? Colors.white
-                              : const Color(0xFF0F172A),
+                          color:
+                              isDark ? Colors.white : const Color(0xFF0F172A),
                           fontSize: 15.5,
                           height: 1.35,
                         ),
@@ -741,9 +741,8 @@ class _MessageBubble extends StatelessWidget {
                           const SizedBox(width: 8),
                           Text('Note vocale',
                               style: TextStyle(
-                                  color: isDark
-                                      ? Colors.white
-                                      : Colors.black87)),
+                                  color:
+                                      isDark ? Colors.white : Colors.black87)),
                         ],
                       ),
                     const SizedBox(height: 2),

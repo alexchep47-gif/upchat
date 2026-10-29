@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/theme/app_theme.dart';
-import 'core/theme/app_colors.dart';
 import 'core/theme/app_glass.dart';
 import 'core/constants/app_constants.dart';
 import 'core/routes/app_router.dart';
@@ -382,8 +381,9 @@ class UpChatApp extends StatelessWidget {
               final activeGlass =
                   activeTheme.extension<AppGlass>() ?? AppGlass.light;
               setWebThemeColor(activeGlass.chatGradientTop);
-              final overlay = Theme.of(context).appBarTheme.systemOverlayStyle ??
-                  SystemUiOverlayStyle.light;
+              final overlay =
+                  Theme.of(context).appBarTheme.systemOverlayStyle ??
+                      SystemUiOverlayStyle.light;
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: overlay.copyWith(
                   systemNavigationBarContrastEnforced: false,

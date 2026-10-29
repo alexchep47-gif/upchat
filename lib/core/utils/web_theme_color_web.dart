@@ -1,16 +1,17 @@
-import 'dart:html' as html;
-
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 
 void setWebThemeColor(Color color) {
-  final argb = color.value.toRadixString(16).padLeft(8, '0');
+  final argb = color.toARGB32().toRadixString(16).padLeft(8, '0');
   final cssColor = '#${argb.substring(2).toUpperCase()}';
 
-  for (final element
-      in html.document.querySelectorAll('meta[name="theme-color"]')) {
-    if (element is html.MetaElement) element.content = cssColor;
+  final themeColors = web.document.querySelectorAll('meta[name="theme-color"]');
+  for (var i = 0; i < themeColors.length; i++) {
+    final element = themeColors.item(i);
+    if (element is web.HTMLMetaElement) element.content = cssColor;
   }
 
-  html.document.documentElement?.style.backgroundColor = cssColor;
-  html.document.body?.style.backgroundColor = cssColor;
+  final root = web.document.documentElement;
+  if (root is web.HTMLElement) root.style.backgroundColor = cssColor;
+  web.document.body?.style.backgroundColor = cssColor;
 }
