@@ -46,8 +46,8 @@ jobs:
 
       - name: Inject Android Firebase configuration and fixed keystore
         env:
-          FIREBASE_ANDROID_JSON_BASE64: ${{ secrets.FIREBASE_ANDROID_JSON_BASE64 }}
-          UPCHAT_KEYSTORE_BASE64: ${{ secrets.UPCHAT_KEYSTORE_BASE64 }}
+          FIREBASE_ANDROID_JSON_BASE64: ${{ secrets.FIREBASE_ANDROID_JSON_BASE64 || secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+          UPCHAT_KEYSTORE_BASE64: ${{ secrets.UPCHAT_KEYSTORE_BASE64 || secrets.KEYSTORE_BASE64 }}
         run: |
           if [ -n "$FIREBASE_ANDROID_JSON_BASE64" ]; then
             printf '%s' "$FIREBASE_ANDROID_JSON_BASE64" | base64 --decode > android/app/google-services.json
@@ -62,13 +62,16 @@ jobs:
           fi
 
       - name: Get dependencies
-        run: flutter pub get
+        run: |
+          flutter clean
+          rm -rf android/.gradle
+          flutter pub get
 
       - name: Validate Android release keystore
         env:
-          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
-          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
-          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS || secrets.KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD || secrets.KEY_PASSWORD }}
         run: |
           if [ -f android/app/release-keystore.jks ]; then
             STORE_PASSWORD=$(printf '%s' "$UPCHAT_KEYSTORE_PASSWORD" | tr -d '\r\n')
@@ -105,17 +108,29 @@ jobs:
 
       - name: Build universal APK (Android 9+) — signed release
         env:
-          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
-          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
-          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
-        run: flutter build apk --release
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS || secrets.KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
+          UPCHAT_SERVER_URL: ${{ secrets.UPCHAT_SERVER_URL }}
+        run: |
+          DEFINES=()
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then DEFINES+=("--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"); fi
+          if [ -n "$UPCHAT_SERVER_URL" ]; then DEFINES+=("--dart-define=UPCHAT_SERVER_URL=$UPCHAT_SERVER_URL"); fi
+          flutter build apk --release "${DEFINES[@]}"
 
       - name: Build APKs by ABI — signed release
         env:
-          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD }}
-          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS }}
-          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD }}
-        run: flutter build apk --release --split-per-abi
+          UPCHAT_KEYSTORE_PASSWORD: ${{ secrets.UPCHAT_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          UPCHAT_KEY_ALIAS: ${{ secrets.UPCHAT_KEY_ALIAS || secrets.KEY_ALIAS }}
+          UPCHAT_KEY_PASSWORD: ${{ secrets.UPCHAT_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
+          UPCHAT_SERVER_URL: ${{ secrets.UPCHAT_SERVER_URL }}
+        run: |
+          DEFINES=()
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then DEFINES+=("--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"); fi
+          if [ -n "$UPCHAT_SERVER_URL" ]; then DEFINES+=("--dart-define=UPCHAT_SERVER_URL=$UPCHAT_SERVER_URL"); fi
+          flutter build apk --release --split-per-abi "${DEFINES[@]}"
 
       - name: Verify APK signatures
         run: |

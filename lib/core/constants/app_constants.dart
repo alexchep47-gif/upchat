@@ -1,7 +1,7 @@
 /// Constantes globales de l'application UpChat
 class AppConstants {
   static const String appName = 'UpChat';
-  static const String appVersion = '1.3.1';
+  static const String appVersion = '1.3.2';
   static const String appTagline = 'Messagerie 100 % offline';
 
   // Auteur
@@ -21,8 +21,10 @@ class AppConstants {
   static const String strategy = 'P2P_CLUSTER';
 
   // Signalisation mode internet (Render + PostgreSQL)
-  static const String signalingBaseUrl =
-      'https://upchat-signal.onrender.com';
+  static const String signalingBaseUrl = String.fromEnvironment(
+    'UPCHAT_SERVER_URL',
+    defaultValue: 'https://upchat-signal.onrender.com',
+  );
 
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);
@@ -54,7 +56,8 @@ class AppConstants {
   static const String keyOnlineStatus = 'settings_online_status';
   static const String keyTypingIndicators = 'settings_typing_indicators';
   static const String keyNotificationSounds = 'settings_notification_sounds';
-  static const String keyNotificationVibration = 'settings_notification_vibration';
+  static const String keyNotificationVibration =
+      'settings_notification_vibration';
   static const String keyNotificationPreview = 'settings_notification_preview';
   static const String keyEnterToSend = 'settings_enter_to_send';
   static const String keyAutoDownloadMedia = 'settings_auto_download_media';
@@ -62,6 +65,7 @@ class AppConstants {
   static const String keyLowDataMode = 'settings_low_data_mode';
   static const String keyTransparentToolbar = 'settings_transparent_toolbar';
   static const String keyChatFontScale = 'settings_chat_font_scale';
+  static const String keyBiometricLock = 'settings_biometric_lock';
 
   // Stockage local sensible
   static const String secureSettingsBox = 'secure_settings';

@@ -40,7 +40,9 @@ class StorageService {
         await _settingsBox.put(AppConstants.keyEncryptionKey, key);
       } else {
         await _secureStorage.write(
-            key: AppConstants.keyEncryptionKey, value: key);
+          key: AppConstants.keyEncryptionKey,
+          value: key,
+        );
       }
       encryptionKey = key;
     }
@@ -56,18 +58,30 @@ class StorageService {
       encryptionCipher: webSafeCipher,
     );
     await _migrateSensitiveSettings();
-    _usersBox =
-        await Hive.openBox(_boxName('users'), encryptionCipher: webSafeCipher);
-    _conversationsBox = await Hive.openBox(_boxName('conversations'),
-        encryptionCipher: webSafeCipher);
-    _messagesBox = await Hive.openBox(_boxName('messages'),
-        encryptionCipher: webSafeCipher);
-    _groupsBox =
-        await Hive.openBox(_boxName('groups'), encryptionCipher: webSafeCipher);
-    _storiesBox =
-        await Hive.openBox(_boxName('stories'), encryptionCipher: webSafeCipher);
-    _phoneDirectoryBox = await Hive.openBox(_boxName('phone_directory'),
-        encryptionCipher: webSafeCipher);
+    _usersBox = await Hive.openBox(
+      _boxName('users'),
+      encryptionCipher: webSafeCipher,
+    );
+    _conversationsBox = await Hive.openBox(
+      _boxName('conversations'),
+      encryptionCipher: webSafeCipher,
+    );
+    _messagesBox = await Hive.openBox(
+      _boxName('messages'),
+      encryptionCipher: webSafeCipher,
+    );
+    _groupsBox = await Hive.openBox(
+      _boxName('groups'),
+      encryptionCipher: webSafeCipher,
+    );
+    _storiesBox = await Hive.openBox(
+      _boxName('stories'),
+      encryptionCipher: webSafeCipher,
+    );
+    _phoneDirectoryBox = await Hive.openBox(
+      _boxName('phone_directory'),
+      encryptionCipher: webSafeCipher,
+    );
 
     if (_secureSettingsBox.get(AppConstants.keyUserId) == null) {
       final userId = const Uuid().v4();
@@ -77,10 +91,7 @@ class StorageService {
       final deviceSecret = base64Url.encode(
         List<int>.generate(32, (_) => Random.secure().nextInt(256)),
       );
-      await _secureSettingsBox.put(
-        AppConstants.keyDeviceSecret,
-        deviceSecret,
-      );
+      await _secureSettingsBox.put(AppConstants.keyDeviceSecret, deviceSecret);
     }
   }
 
@@ -121,8 +132,11 @@ class StorageService {
       _secureSettingsBox.get(AppConstants.keyDeviceSecret) as String;
 
   static String get userName =>
-      _secureSettingsBox
-          .get(AppConstants.keyUserName, defaultValue: 'Utilisateur') as String;
+      _secureSettingsBox.get(
+            AppConstants.keyUserName,
+            defaultValue: 'Utilisateur',
+          )
+          as String;
 
   static Future<void> setUserName(String name) async {
     await _secureSettingsBox.put(AppConstants.keyUserName, name);
@@ -174,8 +188,9 @@ class StorageService {
     await _settingsBox.put(AppConstants.keyAutoCleanup, value);
   }
 
-  static bool get autoPlayStories => _settingsBox
-      .get(AppConstants.keyAutoPlayStories, defaultValue: true) as bool;
+  static bool get autoPlayStories =>
+      _settingsBox.get(AppConstants.keyAutoPlayStories, defaultValue: true)
+          as bool;
 
   static Future<void> setAutoPlayStories(bool value) async {
     await _settingsBox.put(AppConstants.keyAutoPlayStories, value);
@@ -187,6 +202,14 @@ class StorageService {
 
   static Future<void> setStoryViewDuration(int seconds) async {
     await _settingsBox.put(AppConstants.keyStoryViewDuration, seconds);
+  }
+
+  static bool get biometricLockEnabled =>
+      _secureSettingsBox.get(AppConstants.keyBiometricLock, defaultValue: false)
+          as bool;
+
+  static Future<void> setBiometricLockEnabled(bool enabled) async {
+    await _secureSettingsBox.put(AppConstants.keyBiometricLock, enabled);
   }
 
   static Future<void> clearChats() async {

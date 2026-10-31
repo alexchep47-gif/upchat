@@ -69,6 +69,7 @@ jobs:
           add NSCameraUsageDescription "UpChat utilise la caméra pour les photos et stories."
           add NSMicrophoneUsageDescription "UpChat utilise le microphone pour les messages vocaux."
           add NSPhotoLibraryUsageDescription "UpChat utilise la photothèque pour envoyer des médias."
+          add NSFaceIDUsageDescription "UpChat utilise Face ID pour protéger l’accès à vos discussions sur cet appareil."
 
       - name: Dependencies + icons
         run: |
@@ -76,13 +77,17 @@ jobs:
           dart run flutter_launcher_icons || true
 
       - name: Build unsigned IPA (no-codesign) for Sideloadly
+        env:
+          GOOGLE_SERVER_CLIENT_ID: ${{ secrets.GOOGLE_SERVER_CLIENT_ID }}
         run: |
           set -euo pipefail
           rm -rf symbols build/ios/ipa build/ios/archive /tmp/upchat-payload
           mkdir -p symbols build/ios/ipa
 
           # 1) Archive Flutter sans signature
-          flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols
+          DEFINES=()
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then DEFINES+=("--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"); fi
+          flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols "${DEFINES[@]}"
 
           # 2) Localiser le .app dans le xcarchive
           ARCHIVE=$(find build/ios/archive -maxdepth 1 -name '*.xcarchive' -print -quit)

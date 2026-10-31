@@ -1,7 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
 import '../../firebase_options.dart';
 
 /// Authentification distante optionnelle. Le mode hors ligne reste autonome.
@@ -10,49 +11,58 @@ class FirebaseAuthService {
   static final FirebaseAuthService instance = FirebaseAuthService._();
 
   FirebaseAuth? _auth;
+  Future<bool>? _initialization;
   String? lastError;
+  String? lastTechnicalError;
 
   bool get isConfigured => _auth != null;
   User? get currentUser => _auth?.currentUser;
 
-  /// Client OAuth Web (requis sur Android pour obtenir un idToken valide).
-  /// Défini via --dart-define=GOOGLE_SERVER_CLIENT_ID=xxx.apps.googleusercontent.com
-  /// ou secret CI injecté dans firebase_options / env.
+  /// Client OAuth Web requis pour échanger le jeton Google côté Firebase sur
+  /// Android et iOS. La CI le transmet via GOOGLE_SERVER_CLIENT_ID.
   static const _serverClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
     defaultValue: '',
   );
 
-  Future<bool> initialize() async {
-    if (_auth != null) return true;
+  Future<bool> initialize() {
+    if (_auth != null) return Future.value(true);
+    final inProgress = _initialization;
+    if (inProgress != null) return inProgress;
+
+    final initialization = _initialize();
+    _initialization = initialization.then((success) {
+      if (!success) {
+        _initialization = null;
+      }
+      return success;
+    });
+    return _initialization!;
+  }
+
+  Future<bool> _initialize() async {
     try {
       if (Firebase.apps.isEmpty) {
-        try {
-          if (DefaultFirebaseOptions.isConfigured) {
-            await Firebase.initializeApp(
-              options: DefaultFirebaseOptions.currentPlatform,
-            );
-          } else if (!kIsWeb) {
-            // Android/iOS : google-services.json / GoogleService-Info.plist
-            await Firebase.initializeApp();
-          } else {
-            throw StateError('Firebase web non configuré');
-          }
-        } catch (e) {
-          if (kIsWeb) rethrow;
-          // Dernier recours Android/iOS natif
-          if (Firebase.apps.isEmpty) {
-            await Firebase.initializeApp();
-          }
+        if (kIsWeb) {
+          // Le build Web reçoit le fichier FlutterFire complet via un secret.
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        } else {
+          // Android/iOS lisent uniquement leur configuration native injectée
+          // par la CI (google-services.json / GoogleService-Info.plist).
+          await Firebase.initializeApp();
         }
       }
       _auth = FirebaseAuth.instance;
       lastError = null;
+      lastTechnicalError = null;
       return true;
     } catch (error) {
+      lastTechnicalError = error.toString();
       lastError =
-          'Firebase indisponible ($error). UpChat reste utilisable hors ligne.';
-      debugPrint('FirebaseAuthService.init: $error');
+          'Le service de connexion est indisponible pour le moment. UpChat reste utilisable hors ligne.';
+      debugPrint('FirebaseAuthService.initialize: $error');
       return false;
     }
   }
@@ -61,12 +71,13 @@ class FirebaseAuthService {
     if (!await initialize()) return null;
     try {
       lastError = null;
+      lastTechnicalError = null;
       return await _auth!.signInWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-    } on FirebaseAuthException catch (e) {
-      lastError = e.message ?? e.code;
+    } on FirebaseAuthException catch (error) {
+      _rememberAuthException(error);
       rethrow;
     }
   }
@@ -75,12 +86,27 @@ class FirebaseAuthService {
     if (!await initialize()) return null;
     try {
       lastError = null;
+      lastTechnicalError = null;
       return await _auth!.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
       );
-    } on FirebaseAuthException catch (e) {
-      lastError = e.message ?? e.code;
+    } on FirebaseAuthException catch (error) {
+      _rememberAuthException(error);
+      rethrow;
+    }
+  }
+
+  Future<void> sendPasswordReset(String email) async {
+    if (!await initialize()) {
+      throw StateError(lastError ?? 'Service de connexion indisponible.');
+    }
+    try {
+      await _auth!.sendPasswordResetEmail(email: email.trim());
+      lastError = null;
+      lastTechnicalError = null;
+    } on FirebaseAuthException catch (error) {
+      _rememberAuthException(error);
       rethrow;
     }
   }
@@ -88,6 +114,7 @@ class FirebaseAuthService {
   Future<UserCredential?> signInWithGoogle() async {
     if (!await initialize()) return null;
     lastError = null;
+    lastTechnicalError = null;
     try {
       if (kIsWeb) {
         final provider = GoogleAuthProvider()
@@ -95,11 +122,9 @@ class FirebaseAuthService {
         return await _auth!.signInWithPopup(provider);
       }
 
-      // Android / iOS : serverClientId = client OAuth type Web de Firebase
       final googleSignIn = GoogleSignIn(
         scopes: const ['email', 'profile'],
-        serverClientId:
-            _serverClientId.isNotEmpty ? _serverClientId : null,
+        serverClientId: _serverClientId.isNotEmpty ? _serverClientId : null,
       );
       final googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
@@ -108,8 +133,9 @@ class FirebaseAuthService {
       }
       final auth = await googleUser.authentication;
       if (auth.idToken == null && auth.accessToken == null) {
-        lastError =
-            'Google n’a pas renvoyé de jeton. Ajoute le SHA-1 de l’APK dans Firebase Console → Paramètres du projet → Ton app Android, puis le client OAuth Web (GOOGLE_SERVER_CLIENT_ID).';
+        lastTechnicalError =
+            'Google Sign-In returned no ID token or access token.';
+        lastError = 'Connexion Google indisponible pour le moment.';
         return null;
       }
       final credential = GoogleAuthProvider.credential(
@@ -117,11 +143,13 @@ class FirebaseAuthService {
         idToken: auth.idToken,
       );
       return await _auth!.signInWithCredential(credential);
-    } on FirebaseAuthException catch (e) {
-      lastError = e.message ?? e.code;
+    } on FirebaseAuthException catch (error) {
+      _rememberAuthException(error);
       rethrow;
-    } catch (e) {
-      lastError = 'Google Sign-In : $e';
+    } catch (error) {
+      lastTechnicalError = error.toString();
+      lastError = 'Connexion Google indisponible pour le moment.';
+      debugPrint('FirebaseAuthService.signInWithGoogle: $error');
       rethrow;
     }
   }
@@ -131,5 +159,11 @@ class FirebaseAuthService {
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}
+  }
+
+  void _rememberAuthException(FirebaseAuthException error) {
+    lastTechnicalError = '${error.code}: ${error.message}';
+    lastError = 'Connexion indisponible pour le moment. Réessaie plus tard.';
+    debugPrint('FirebaseAuthService.auth: $lastTechnicalError');
   }
 }

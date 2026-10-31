@@ -42,6 +42,13 @@ android {
         }
     }
     buildTypes {
+        debug {
+            // La CI utilise aussi la clé fixe pour que les empreintes Firebase
+            // restent identiques pendant les essais d’APK signés.
+            signingConfig = file('release-keystore.jks').exists()
+                ? signingConfigs.release
+                : signingConfigs.debug
+        }
         release {
             // Keystore fixe injectée par CI ; fallback debug uniquement pour un build local.
             signingConfig = file('release-keystore.jks').exists()

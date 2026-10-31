@@ -18,6 +18,8 @@ import 'providers/chat_provider.dart';
 import 'providers/stories_provider.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/settings_provider.dart';
+import 'providers/biometric_lock_provider.dart';
+import 'widgets/app_lock_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,14 +28,16 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.light,
-    systemNavigationBarContrastEnforced: false,
-    systemStatusBarContrastEnforced: false,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
+      systemStatusBarContrastEnforced: false,
+    ),
+  );
   runApp(const AppBootstrap());
 }
 
@@ -47,9 +51,9 @@ Future<void> _initializeLocalOnly() async {
 
 Future<void> _warmUpFirebaseInBackground() async {
   try {
-    await FirebaseAuthService.instance
-        .initialize()
-        .timeout(const Duration(seconds: 8));
+    await FirebaseAuthService.instance.initialize().timeout(
+      const Duration(seconds: 8),
+    );
   } catch (_) {}
 }
 
@@ -93,7 +97,6 @@ class _AppBootstrapState extends State<AppBootstrap> {
         }
         if (snapshot.hasError) {
           return _StartupError(
-            error: snapshot.error,
             onRetry: _retry,
             onContinueOffline: _continueOffline,
           );
@@ -118,11 +121,7 @@ class _StartupScreen extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFF1565C0),
-                Color(0xFF0D47A1),
-                Color(0xFF061428),
-              ],
+              colors: [Color(0xFF1565C0), Color(0xFF0D47A1), Color(0xFF061428)],
               stops: [0.0, 0.45, 1.0],
             ),
           ),
@@ -139,10 +138,8 @@ class _StartupScreen extends StatelessWidget {
                       tween: Tween(begin: 0.85, end: 1),
                       duration: const Duration(milliseconds: 900),
                       curve: Curves.easeOutBack,
-                      builder: (context, scale, child) => Transform.scale(
-                        scale: scale,
-                        child: child,
-                      ),
+                      builder: (context, scale, child) =>
+                          Transform.scale(scale: scale, child: child),
                       child: const _BrandCard(),
                     ),
                     const SizedBox(height: 28),
@@ -244,10 +241,16 @@ class _BrandCard extends StatelessWidget {
               alignment: Alignment.center,
               children: [
                 // Contour type bulle (léger décalage bas-gauche pour « queue »)
-                Icon(Icons.chat_bubble_rounded,
-                    color: Color(0xFF1565C0), size: 72),
-                Icon(Icons.arrow_upward_rounded,
-                    color: Color(0xFF0A1628), size: 36),
+                Icon(
+                  Icons.chat_bubble_rounded,
+                  color: Color(0xFF1565C0),
+                  size: 72,
+                ),
+                Icon(
+                  Icons.arrow_upward_rounded,
+                  color: Color(0xFF0A1628),
+                  size: 36,
+                ),
               ],
             ),
           ),
@@ -267,15 +270,10 @@ class _BrandCard extends StatelessWidget {
 }
 
 class _StartupError extends StatelessWidget {
-  final Object? error;
   final VoidCallback onRetry;
   final VoidCallback onContinueOffline;
 
-  const _StartupError({
-    required this.error,
-    required this.onRetry,
-    required this.onContinueOffline,
-  });
+  const _StartupError({required this.onRetry, required this.onContinueOffline});
 
   @override
   Widget build(BuildContext context) {
@@ -289,8 +287,11 @@ class _StartupError extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.cloud_off_rounded,
-                    color: Color(0xFF42A5F5), size: 48),
+                const Icon(
+                  Icons.cloud_off_rounded,
+                  color: Color(0xFF42A5F5),
+                  size: 48,
+                ),
                 const SizedBox(height: 16),
                 const Text(
                   'Préparation locale interrompue',
@@ -303,12 +304,12 @@ class _StartupError extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$error',
+                  'Les données locales n’ont pas pu être préparées pour le moment.',
                   textAlign: TextAlign.center,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.7), fontSize: 13),
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -316,7 +317,9 @@ class _StartupError extends StatelessWidget {
                   'Tu peux continuer en mode hors ligne.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                      color: Colors.white.withOpacity(0.55), fontSize: 13),
+                    color: Colors.white.withOpacity(0.55),
+                    fontSize: 13,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 FilledButton.icon(
@@ -367,9 +370,10 @@ class UpChatApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StoriesProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProvider(create: (_) => BiometricLockProvider()),
       ],
-      child: Consumer2<ThemeProvider, SettingsProvider>(
-        builder: (context, themeProvider, settings, _) {
+      child: Consumer3<ThemeProvider, SettingsProvider, BiometricLockProvider>(
+        builder: (context, themeProvider, settings, biometricLock, _) {
           return MaterialApp(
             title: AppConstants.appName,
             debugShowCheckedModeBanner: false,
@@ -383,7 +387,7 @@ class UpChatApp extends StatelessWidget {
               setWebThemeColor(activeGlass.chatGradientTop);
               final overlay =
                   Theme.of(context).appBarTheme.systemOverlayStyle ??
-                      SystemUiOverlayStyle.light;
+                  SystemUiOverlayStyle.light;
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: overlay.copyWith(
                   systemNavigationBarContrastEnforced: false,
@@ -393,7 +397,7 @@ class UpChatApp extends StatelessWidget {
                   data: MediaQuery.of(context).copyWith(
                     textScaler: TextScaler.linear(settings.chatFontScale),
                   ),
-                  child: child ?? const SizedBox.shrink(),
+                  child: AppLockGate(child: child ?? const SizedBox.shrink()),
                 ),
               );
             },

@@ -19,6 +19,7 @@ Nationalité : **Camerounaise**
 - Accusés de réception / lecture
 - Indicateur « en train d'écrire »
 - Chiffrement local (Hive + AES)
+- Verrou biométrique facultatif au retour dans l’application
 - Thème clair / sombre OLED
 - Interface en français
 
