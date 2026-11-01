@@ -85,9 +85,11 @@ jobs:
           mkdir -p symbols build/ios/ipa
 
           # 1) Archive Flutter sans signature
-          DEFINES=()
-          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then DEFINES+=("--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"); fi
-          flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols "${DEFINES[@]}"
+          if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
+            flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols "--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+          else
+            flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols
+          fi
 
           # 2) Localiser le .app dans le xcarchive
           ARCHIVE=$(find build/ios/archive -maxdepth 1 -name '*.xcarchive' -print -quit)
