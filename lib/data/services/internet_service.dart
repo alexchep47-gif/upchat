@@ -32,9 +32,12 @@ class InternetService {
   bool _isConnectedToSignaling = false;
   Timer? _heartbeatTimer;
   Timer? _inboxTimer;
+  Timer? _reconnectTimer;
   bool _flushInProgress = false;
   bool _inboxPullInProgress = false;
+  bool _reconnectAttemptInProgress = false;
   Future<bool>? _reconnectFuture;
+  String? _serverAuthMode;
 
   // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
@@ -43,6 +46,7 @@ class InternetService {
   final Map<String, DateTime> _onlinePeers = {};
 
   Function(MessageModel)? onMessageReceived;
+  Function(String messageId, MessageStatus status)? onMessageStatus;
   Function(String userId, bool online)? onPeerPresence;
   Function(bool online)? onConnectivityChanged;
 
@@ -56,12 +60,34 @@ class InternetService {
     return Uri.parse('$base$path').replace(queryParameters: query);
   }
 
+  @visibleForTesting
+  static String selectBearerToken({
+    required bool firebaseAdmin,
+    required String? firebaseToken,
+    required String deviceSecret,
+  }) {
+    if (firebaseAdmin) {
+      if (firebaseToken == null || firebaseToken.isEmpty) {
+        throw StateError('Un ID token Firebase est requis par le relais.');
+      }
+      return firebaseToken;
+    }
+    return deviceSecret;
+  }
+
   Future<Map<String, String>> get _headers async {
     final firebaseUser = FirebaseAuthService.instance.currentUser;
-    final firebaseToken = await firebaseUser?.getIdToken();
+    final firebaseToken = _serverAuthMode == 'firebase-admin'
+        ? await firebaseUser?.getIdToken()
+        : null;
+    final token = selectBearerToken(
+      firebaseAdmin: _serverAuthMode == 'firebase-admin',
+      firebaseToken: firebaseToken,
+      deviceSecret: StorageService.deviceSecret,
+    );
     return {
       'Content-Type': 'application/json',
-      'Authorization': 'Bearer ${firebaseToken?.isNotEmpty == true ? firebaseToken : StorageService.deviceSecret}',
+      'Authorization': 'Bearer $token',
       'X-UpChat-Client': AppConstants.appVersion,
     };
   }
@@ -87,8 +113,12 @@ class InternetService {
         _outbox.add(Map<String, dynamic>.from(value));
       }
     }
-    _enabled = StorageService.settings
-            .get(AppConstants.keyInternetMode, defaultValue: false) as bool;
+    _enabled =
+        StorageService.settings.get(
+              AppConstants.keyInternetMode,
+              defaultValue: false,
+            )
+            as bool;
     if (_enabled) await _start();
   }
 
@@ -100,12 +130,14 @@ class InternetService {
 
     if (_isConnectedToSignaling) {
       _isOnline = true;
+      _cancelReconnect();
       onConnectivityChanged?.call(true);
       await _flushOutbox();
       _startHeartbeat();
       _startInboxPolling();
     } else {
       onConnectivityChanged?.call(false);
+      _scheduleReconnect();
     }
   }
 
@@ -114,6 +146,7 @@ class InternetService {
     _heartbeatTimer = null;
     _inboxTimer?.cancel();
     _inboxTimer = null;
+    _cancelReconnect();
     _isOnline = false;
     _isConnectedToSignaling = false;
     _onlinePeers.clear();
@@ -124,11 +157,14 @@ class InternetService {
   /// Connexion + enregistrement sur le serveur de signalisation
   Future<void> _connectSignaling() async {
     try {
+      await _refreshServerAuthMode();
       final phone = StorageService.userPhone;
+      final firebaseUser = FirebaseAuthService.instance.currentUser;
+      final useFirebaseAuth = _serverAuthMode == 'firebase-admin';
       final body = {
-        'userId': FirebaseAuthService.instance.currentUser?.uid ?? StorageService.userId,
+        'userId': firebaseUser?.uid ?? StorageService.userId,
         'name': StorageService.userName,
-        if (FirebaseAuthService.instance.currentUser == null) 'deviceSecret': StorageService.deviceSecret,
+        if (!useFirebaseAuth) 'deviceSecret': StorageService.deviceSecret,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       };
 
@@ -154,6 +190,68 @@ class InternetService {
     }
   }
 
+  /// Le relais expose son mode d'authentification afin que les anciennes
+  /// installations utilisent leur secret d'appareil et qu'un serveur migré
+  /// vers Firebase Admin reçoive un ID token Firebase.
+  Future<void> _refreshServerAuthMode() async {
+    try {
+      final response = await http
+          .get(_uri('/api/health'))
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode != 200) return;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) return;
+      final mode = decoded['auth'];
+      if (mode == 'firebase-admin' || mode == 'legacy-device-token') {
+        _serverAuthMode = mode as String;
+      }
+    } catch (error) {
+      debugPrint('InternetService: lecture du mode serveur impossible: $error');
+    }
+  }
+
+  void _scheduleReconnect() {
+    if (!_enabled || _reconnectTimer != null) return;
+    _reconnectTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!_enabled) {
+        _cancelReconnect();
+        return;
+      }
+      if (_reconnectAttemptInProgress) return;
+
+      _reconnectAttemptInProgress = true;
+      try {
+        await _connectSignaling();
+        if (!_enabled || !_isConnectedToSignaling) return;
+
+        _isOnline = true;
+        _cancelReconnect();
+        onConnectivityChanged?.call(true);
+        await _flushOutbox();
+        _startHeartbeat();
+        _startInboxPolling();
+      } finally {
+        _reconnectAttemptInProgress = false;
+      }
+    });
+  }
+
+  void _cancelReconnect() {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+  }
+
+  void _markDisconnected() {
+    _isOnline = false;
+    _isConnectedToSignaling = false;
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+    _inboxTimer?.cancel();
+    _inboxTimer = null;
+    onConnectivityChanged?.call(false);
+    _scheduleReconnect();
+  }
+
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(AppConstants.presenceHeartbeat, (_) async {
@@ -169,7 +267,9 @@ class InternetService {
               }),
             )
             .timeout(const Duration(seconds: 8));
-      } catch (_) {}
+      } catch (_) {
+        _markDisconnected();
+      }
     });
   }
 
@@ -182,9 +282,13 @@ class InternetService {
     final future = () async {
       _isConnectedToSignaling = false;
       await _connectSignaling();
-      if (!_isConnectedToSignaling) return false;
+      if (!_isConnectedToSignaling) {
+        _scheduleReconnect();
+        return false;
+      }
 
       _isOnline = true;
+      _cancelReconnect();
       onConnectivityChanged?.call(true);
       _startHeartbeat();
       _startInboxPolling();
@@ -204,7 +308,10 @@ class InternetService {
   }
 
   Future<void> _pullInbox({bool retryAfterAuth = true}) async {
-    if (_inboxPullInProgress || !_enabled || !_isOnline || !_isConnectedToSignaling) {
+    if (_inboxPullInProgress ||
+        !_enabled ||
+        !_isOnline ||
+        !_isConnectedToSignaling) {
       return;
     }
     _inboxPullInProgress = true;
@@ -221,13 +328,16 @@ class InternetService {
       }
       if (res.statusCode != 200) return;
       final decoded = jsonDecode(res.body);
-      final rawMessages = decoded is Map<String, dynamic> ? decoded['messages'] : null;
+      final rawMessages = decoded is Map<String, dynamic>
+          ? decoded['messages']
+          : null;
       if (rawMessages is! List) return;
       for (final raw in rawMessages) {
         if (raw is Map) handleIncoming(Map<String, dynamic>.from(raw));
       }
     } catch (error) {
       debugPrint('InternetService: inbox error: $error');
+      _markDisconnected();
     } finally {
       _inboxPullInProgress = false;
     }
@@ -257,7 +367,9 @@ class InternetService {
     }
     if (!_isOnline || !_isConnectedToSignaling) {
       if (requireRegisteredAccount) {
-        throw StateError('Le serveur UpChat est indisponible pour vérifier ce numéro.');
+        throw StateError(
+          'Le serveur UpChat est indisponible pour vérifier ce numéro.',
+        );
       }
       return null;
     }
@@ -275,7 +387,8 @@ class InternetService {
             name: data['name'] as String? ?? phone,
             phoneNumber: phone,
             lastSeen: data['lastSeen'] != null
-                ? DateTime.tryParse(data['lastSeen'] as String) ?? DateTime.now()
+                ? DateTime.tryParse(data['lastSeen'] as String) ??
+                      DateTime.now()
                 : DateTime.now(),
           );
           await _directory.upsert(user);
@@ -284,7 +397,10 @@ class InternetService {
       } else if (res.statusCode == 401) {
         await _connectSignaling();
         if (_isConnectedToSignaling) {
-          return await lookupByPhone(phone, requireRegisteredAccount: requireRegisteredAccount);
+          return await lookupByPhone(
+            phone,
+            requireRegisteredAccount: requireRegisteredAccount,
+          );
         }
       } else if (res.statusCode >= 500) {
         throw StateError('Le serveur UpChat est temporairement indisponible.');
@@ -304,6 +420,7 @@ class InternetService {
 
   /// Envoie un message via internet (ou le met en file d'attente)
   Future<bool> sendMessage({
+    String? messageId,
     required String targetUserId,
     required String conversationId,
     required String text,
@@ -313,7 +430,7 @@ class InternetService {
   }) async {
     final payload = {
       'type': 'message',
-      'id': _uuid.v4(),
+      'id': messageId ?? _uuid.v4(),
       'conversationId': conversationId,
       'senderId': StorageService.userId,
       'senderName': StorageService.userName,
@@ -354,6 +471,10 @@ class InternetService {
           .timeout(const Duration(seconds: 12));
 
       if (res.statusCode >= 200 && res.statusCode < 300) {
+        final messageId = payload['id'];
+        if (messageId is String) {
+          onMessageStatus?.call(messageId, MessageStatus.sent);
+        }
         debugPrint('InternetService: transmission réussie');
         return true;
       }
@@ -363,15 +484,20 @@ class InternetService {
           await _reconnectSignaling()) {
         return await _transmit(payload, retryAfterAuth: false);
       }
-      if (res.statusCode >= 400 && res.statusCode < 500 &&
-          res.statusCode != 408 && res.statusCode != 425 && res.statusCode != 429) {
+      if (res.statusCode >= 400 &&
+          res.statusCode < 500 &&
+          res.statusCode != 408 &&
+          res.statusCode != 425 &&
+          res.statusCode != 429) {
         return false;
       }
       await _queuePayload(payload);
+      _markDisconnected();
       return false;
     } catch (e) {
       debugPrint('InternetService: échec transmission: $e');
       await _queuePayload(payload);
+      _markDisconnected();
       return false;
     }
   }
@@ -414,14 +540,21 @@ class InternetService {
 
     if (online && !wasOnline && _enabled) {
       await _connectSignaling();
-      await _flushOutbox();
-      _startHeartbeat();
-      _startInboxPolling();
+      if (_isConnectedToSignaling) {
+        _isOnline = true;
+        _cancelReconnect();
+        await _flushOutbox();
+        _startHeartbeat();
+        _startInboxPolling();
+      } else {
+        _scheduleReconnect();
+      }
     } else if (!online) {
       _heartbeatTimer?.cancel();
       _inboxTimer?.cancel();
       _inboxTimer = null;
       _isConnectedToSignaling = false;
+      _scheduleReconnect();
     }
   }
 
@@ -434,9 +567,8 @@ class InternetService {
           map['senderId'] as String? ??
           map['senderUserId'] as String? ??
           '',
-      senderId: map['senderId'] as String? ??
-          map['senderUserId'] as String? ??
-          '',
+      senderId:
+          map['senderId'] as String? ?? map['senderUserId'] as String? ?? '',
       senderName: map['senderName'] as String? ?? 'Inconnu',
       type: MessageType.values.firstWhere(
         (e) => e.name == (map['messageType'] ?? map['type']),
@@ -451,11 +583,13 @@ class InternetService {
     // Enrichit le répertoire local si un téléphone expéditeur est fourni
     final senderPhone = map['senderPhone'] as String?;
     if (senderPhone != null && senderPhone.isNotEmpty) {
-      _directory.upsert(UserModel(
-        id: message.senderId,
-        name: message.senderName,
-        phoneNumber: senderPhone,
-      ));
+      _directory.upsert(
+        UserModel(
+          id: message.senderId,
+          name: message.senderName,
+          phoneNumber: senderPhone,
+        ),
+      );
     }
 
     onMessageReceived?.call(message);

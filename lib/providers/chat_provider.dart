@@ -44,6 +44,7 @@ class ChatProvider extends ChangeNotifier {
       _flushOfflineMessages(endpointId, userId);
     };
     _internet.onMessageReceived = _onIncomingMessage;
+    _internet.onMessageStatus = _updateMessageStatus;
     // Charge le mode internet au démarrage
     _internet.loadPreference();
   }
@@ -64,8 +65,9 @@ class ChatProvider extends ChangeNotifier {
     for (final key in StorageService.conversations.keys) {
       final map = StorageService.conversations.get(key);
       if (map is Map) {
-        _conversations
-            .add(ConversationModel.fromMap(Map<String, dynamic>.from(map)));
+        _conversations.add(
+          ConversationModel.fromMap(Map<String, dynamic>.from(map)),
+        );
       }
     }
     _conversations.sort((a, b) {
@@ -76,7 +78,9 @@ class ChatProvider extends ChangeNotifier {
 
     for (final key in StorageService.messages.keys) {
       if (key.toString().startsWith('relay_') ||
-          key.toString().startsWith('outbox_')) continue;
+          key.toString().startsWith('outbox_')) {
+        continue;
+      }
       final map = StorageService.messages.get(key);
       if (map is Map) {
         try {
@@ -159,12 +163,14 @@ class ChatProvider extends ChangeNotifier {
     if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
-      final shouldTryNet = _internet.isEnabled || (phone != null && phone.isNotEmpty);
+      final shouldTryNet =
+          _internet.isEnabled || (phone != null && phone.isNotEmpty);
       if (shouldTryNet) {
         if (!_internet.isEnabled) {
           await _internet.setEnabled(true);
         }
         success = await _internet.sendMessage(
+          messageId: message.id,
           targetUserId: conversationId,
           conversationId: conversationId,
           text: text,
@@ -174,7 +180,9 @@ class ChatProvider extends ChangeNotifier {
     }
 
     _updateMessageStatus(
-        message.id, success ? MessageStatus.sent : MessageStatus.failed);
+      message.id,
+      success ? MessageStatus.sent : MessageStatus.failed,
+    );
     if (success) await _offline.acknowledge(message.id);
   }
 
@@ -187,10 +195,10 @@ class ChatProvider extends ChangeNotifier {
     final preview = type == MessageType.image
         ? '📷 Photo'
         : type == MessageType.video
-            ? '🎬 Vidéo'
-            : type == MessageType.audio
-                ? '🎤 Note vocale'
-                : '📎 Fichier';
+        ? '🎬 Vidéo'
+        : type == MessageType.audio
+        ? '🎤 Note vocale'
+        : '📎 Fichier';
 
     final message = MessageModel(
       id: _uuid.v4(),
@@ -237,6 +245,7 @@ class ChatProvider extends ChangeNotifier {
       if (_internet.isEnabled || (phone != null && phone.isNotEmpty)) {
         if (!_internet.isEnabled) await _internet.setEnabled(true);
         success = await _internet.sendMessage(
+          messageId: message.id,
           targetUserId: conversationId,
           conversationId: conversationId,
           text: preview,
@@ -248,7 +257,9 @@ class ChatProvider extends ChangeNotifier {
     }
 
     _updateMessageStatus(
-        message.id, success ? MessageStatus.sent : MessageStatus.failed);
+      message.id,
+      success ? MessageStatus.sent : MessageStatus.failed,
+    );
     if (success) await _offline.acknowledge(message.id);
   }
 
@@ -314,10 +325,7 @@ class ChatProvider extends ChangeNotifier {
     final peerId = message.isMe ? message.conversationId : message.senderId;
     final normalized = message.copyWith(conversationId: peerId);
 
-    getOrCreateConversation(
-      peerId: peerId,
-      peerName: normalized.senderName,
-    );
+    getOrCreateConversation(peerId: peerId, peerName: normalized.senderName);
 
     _messages.putIfAbsent(peerId, () => []);
     if (_messages[peerId]!.any((m) => m.id == normalized.id)) return;
@@ -328,8 +336,11 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _updateConversationPreview(String conversationId, String text,
-      {bool isIncoming = false}) {
+  void _updateConversationPreview(
+    String conversationId,
+    String text, {
+    bool isIncoming = false,
+  }) {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index == -1) return;
 
@@ -349,8 +360,10 @@ class ChatProvider extends ChangeNotifier {
     final index = _conversations.indexWhere((c) => c.id == conversationId);
     if (index != -1) {
       _conversations[index] = _conversations[index].copyWith(unreadCount: 0);
-      StorageService.conversations
-          .put(conversationId, _conversations[index].toMap());
+      StorageService.conversations.put(
+        conversationId,
+        _conversations[index].toMap(),
+      );
     }
 
     final msgs = _messages[conversationId] ?? [];
