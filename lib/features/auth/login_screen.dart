@@ -498,7 +498,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               _hasEightCharacters,
                               _hasLetter,
                               _hasDigit,
-                              _password.length >= 12,
+                              _password.text.length >= 12,
                             ].where((value) => value).length),
                             const SizedBox(height: 12),
                             AppTextField(
