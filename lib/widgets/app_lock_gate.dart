@@ -147,6 +147,20 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 10),
+                        TextButton.icon(
+                          onPressed: lock.isAuthenticating ? null : _unlockIfNeeded,
+                          icon: const Icon(Icons.password_rounded),
+                          label: const Text('Utiliser le code du téléphone'),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tes données restent sur ce téléphone. UpChat ne stocke jamais ta biométrie.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
                       ],
                     ),
                   ),

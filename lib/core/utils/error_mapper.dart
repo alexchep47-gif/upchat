@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
 
-enum AuthRecoveryAction { retry, useEmail, signIn }
+enum AuthRecoveryAction { retry, useEmail, signIn, forgotPassword, continueOffline }
 
 class UserFacingError {
   const UserFacingError({required this.message, this.action});
@@ -29,7 +29,8 @@ class ErrorMapper {
         case 'wrong-password':
         case 'invalid-credential':
           return const UserFacingError(
-            message: 'Adresse e-mail ou mot de passe incorrect.',
+            message: 'E-mail ou mot de passe incorrect.',
+            action: AuthRecoveryAction.forgotPassword,
           );
         case 'email-already-in-use':
           return const UserFacingError(
@@ -59,18 +60,14 @@ class ErrorMapper {
             message: isCreatingAccount
                 ? 'Création de compte indisponible pour le moment. Réessaie plus tard.'
                 : 'Connexion indisponible pour le moment. Réessaie plus tard.',
-            action: isGoogle
-                ? AuthRecoveryAction.useEmail
-                : AuthRecoveryAction.retry,
+            action: AuthRecoveryAction.continueOffline,
           );
         default:
           return UserFacingError(
             message: isGoogle
                 ? 'Connexion Google indisponible pour le moment.'
                 : 'Connexion indisponible pour le moment. Réessaie plus tard.',
-            action: isGoogle
-                ? AuthRecoveryAction.useEmail
-                : AuthRecoveryAction.retry,
+            action: AuthRecoveryAction.continueOffline,
           );
       }
     }
@@ -82,9 +79,7 @@ class ErrorMapper {
         message: isCreatingAccount
             ? 'Création de compte indisponible pour le moment. Réessaie plus tard.'
             : 'Connexion indisponible pour le moment. Réessaie plus tard.',
-        action: isGoogle
-            ? AuthRecoveryAction.useEmail
-            : AuthRecoveryAction.retry,
+        action: AuthRecoveryAction.continueOffline,
       );
     }
     if (error is PlatformException ||
@@ -92,7 +87,7 @@ class ErrorMapper {
         raw.contains('api_exception: 10')) {
       return const UserFacingError(
         message: 'Connexion Google indisponible pour le moment.',
-        action: AuthRecoveryAction.useEmail,
+        action: AuthRecoveryAction.continueOffline,
       );
     }
 
@@ -100,7 +95,7 @@ class ErrorMapper {
       message: isGoogle
           ? 'Connexion Google indisponible pour le moment.'
           : 'Connexion indisponible pour le moment. Réessaie plus tard.',
-      action: isGoogle ? AuthRecoveryAction.useEmail : AuthRecoveryAction.retry,
+      action: AuthRecoveryAction.continueOffline,
     );
   }
 }

@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late bool _autoCleanup;
   late bool _autoPlayStories;
   late int _storyDuration;
+  int _versionTaps = 0;
 
   @override
   void initState() {
@@ -431,6 +432,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: connectivity.internetModeEnabled,
                 onChanged: connectivity.setInternetMode,
               ),
+              ListTile(
+                leading: Icon(connectivity.isOnline ? Icons.check_circle_outline : Icons.sync_rounded),
+                title: const Text('Tester maintenant'),
+                subtitle: Text(connectivity.statusLabel),
+                onTap: connectivity.internetModeEnabled ? connectivity.testNow : null,
+              ),
             ]),
             _section('Apparence', Icons.palette_outlined, [
               RadioListTile<ThemeMode>(
@@ -440,7 +447,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (v) => themeProvider.setThemeMode(v!),
               ),
               RadioListTile<ThemeMode>(
-                title: const Text('Sombre OLED'),
+                title: const Text('Sombre'),
                 value: ThemeMode.dark,
                 groupValue: themeProvider.themeMode,
                 onChanged: (v) => themeProvider.setThemeMode(v!),
@@ -453,8 +460,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _toggle(
                 icon: Icons.blur_on_rounded,
-                title: 'Barre d’outils transparente',
-                subtitle: 'Style translucide adaptatif clair et sombre',
+                title: 'Effets de transparence',
+                subtitle: 'Verre flou sur les barres et menus ; désactive-le pour économiser la batterie',
                 value: settings.transparentToolbar,
                 onChanged: settings.setTransparentToolbar,
               ),
@@ -469,13 +476,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('Supprime les messages de cet appareil'),
                 onTap: _confirmClearChats,
               ),
-              ListTile(
-                leading: const Icon(Icons.info_outline),
-                title: const Text('À propos'),
-                subtitle: Text(
-                  '${AppConstants.appName} v${AppConstants.appVersion}',
+              GestureDetector(
+                onTap: () {
+                  _versionTaps += 1;
+                  if (_versionTaps >= 7) {
+                    _versionTaps = 0;
+                    _showInfo('Diagnostic', 'Dernière version : ${AppConstants.appVersion}\nMode local : disponible\nRelais internet : ${connectivity.statusLabel}');
+                  }
+                },
+                child: ListTile(
+                  leading: const Icon(Icons.info_outline),
+                  title: const Text('À propos'),
+                  subtitle: Text('${AppConstants.appName} v${AppConstants.appVersion}'),
+                  onTap: _showAbout,
                 ),
-                onTap: _showAbout,
               ),
             ]),
           ],
@@ -545,7 +559,7 @@ class _SettingsSearchDelegate extends SearchDelegate<void> {
     'Données et stockage',
     'Mode économie de données',
     'Apparence',
-    'Barre d’outils transparente',
+    'Effets de transparence',
   ];
 
   @override

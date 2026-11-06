@@ -45,24 +45,26 @@ class BiometricAuthService {
     try {
       final isSupported = await _localAuthentication.isDeviceSupported();
       final canCheckBiometrics = await _localAuthentication.canCheckBiometrics;
-      if (!isSupported || !canCheckBiometrics) {
+      if (!isSupported) {
         return const BiometricAuthResult(
           BiometricAuthStatus.unavailable,
-          'La biométrie n’est pas prise en charge sur cet appareil.',
+          'La vérification de l’appareil est indisponible. Utilise un téléphone protégé.',
         );
       }
-
-      final enrolled = await _localAuthentication.getAvailableBiometrics();
-      if (enrolled.isEmpty) {
+      if (!canCheckBiometrics) {
         return const BiometricAuthResult(
-          BiometricAuthStatus.notEnrolled,
-          'Ajoute une empreinte ou un visage dans les réglages du téléphone avant d’activer le verrou.',
+          BiometricAuthStatus.available,
+          'La biométrie est indisponible ; le code du téléphone sera proposé.',
         );
       }
-
-      return const BiometricAuthResult(
-        BiometricAuthStatus.available,
-        'La biométrie est disponible.',
+      final enrolled = await _localAuthentication.getAvailableBiometrics();
+      return BiometricAuthResult(
+        enrolled.isEmpty
+            ? BiometricAuthStatus.notEnrolled
+            : BiometricAuthStatus.available,
+        enrolled.isEmpty
+            ? 'Aucune empreinte n’est enregistrée. Le code du téléphone reste disponible.'
+            : 'La biométrie ou le code du téléphone sont disponibles.',
       );
     } on LocalAuthException catch (error) {
       return _fromException(error);
@@ -82,7 +84,9 @@ class BiometricAuthService {
     try {
       final authenticated = await _localAuthentication.authenticate(
         localizedReason: 'Confirme ton identité pour ouvrir UpChat.',
-        biometricOnly: true,
+        // Autorise le code, le schéma ou le mot de passe du téléphone
+        // lorsque la biométrie est indisponible ou temporairement bloquée.
+        biometricOnly: false,
         persistAcrossBackgrounding: true,
       );
       if (authenticated) {
@@ -100,7 +104,7 @@ class BiometricAuthService {
     } catch (_) {
       return const BiometricAuthResult(
         BiometricAuthStatus.failed,
-        'Impossible de vérifier la biométrie pour le moment.',
+        'La vérification est indisponible. Utilise le code de ton téléphone.',
       );
     }
   }
@@ -126,7 +130,7 @@ class BiometricAuthService {
       default:
         return const BiometricAuthResult(
           BiometricAuthStatus.failed,
-          'Impossible de vérifier la biométrie pour le moment.',
+          'La vérification est indisponible. Utilise le code de ton téléphone.',
         );
     }
   }

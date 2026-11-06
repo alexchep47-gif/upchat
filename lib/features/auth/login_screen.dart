@@ -31,9 +31,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _confirmationVisible = false;
   bool _acceptedTerms = false;
   String? _message;
+  String? _googleMessage;
   InlineNoticeType _noticeType = InlineNoticeType.error;
+  InlineNoticeType _googleNoticeType = InlineNoticeType.error;
   AuthRecoveryAction? _recoveryAction;
+  AuthRecoveryAction? _googleRecoveryAction;
   Future<void> Function()? _retryAction;
+  Future<void> Function()? _googleRetryAction;
 
   @override
   void initState() {
@@ -120,9 +124,15 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_loading) return;
     setState(() {
       _loading = true;
-      _message = null;
-      _recoveryAction = null;
-      _retryAction = () => _run(action, isGoogle: isGoogle);
+      if (isGoogle) {
+        _googleMessage = null;
+        _googleRecoveryAction = null;
+        _googleRetryAction = () => _run(action, isGoogle: true);
+      } else {
+        _message = null;
+        _recoveryAction = null;
+        _retryAction = () => _run(action, isGoogle: false);
+      }
     });
 
     try {
@@ -131,9 +141,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _setNotice(
           FirebaseAuthService.instance.lastError ??
               'Le service de connexion est indisponible pour le moment.',
-          action: isGoogle
-              ? AuthRecoveryAction.useEmail
-              : AuthRecoveryAction.retry,
+          action: AuthRecoveryAction.continueOffline,
+          isGoogle: isGoogle,
         );
         return;
       }
@@ -147,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
           isGoogle: isGoogle,
           isCreatingAccount: _mode == _AuthMode.createAccount,
         ),
+        isGoogle: isGoogle,
       );
     } catch (error) {
       debugPrint('Login error: $error');
@@ -156,27 +166,35 @@ class _LoginScreenState extends State<LoginScreen> {
           isGoogle: isGoogle,
           isCreatingAccount: _mode == _AuthMode.createAccount,
         ),
+        isGoogle: isGoogle,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showMappedError(UserFacingError error) {
+  void _showMappedError(UserFacingError error, {required bool isGoogle}) {
     HapticFeedback.lightImpact();
-    _setNotice(error.message, action: error.action);
+    _setNotice(error.message, action: error.action, isGoogle: isGoogle);
   }
 
   void _setNotice(
     String message, {
     AuthRecoveryAction? action,
     InlineNoticeType type = InlineNoticeType.error,
+    bool isGoogle = false,
   }) {
     if (!mounted) return;
     setState(() {
-      _message = message;
-      _noticeType = type;
-      _recoveryAction = action;
+      if (isGoogle) {
+        _googleMessage = message;
+        _googleNoticeType = type;
+        _googleRecoveryAction = action;
+      } else {
+        _message = message;
+        _noticeType = type;
+        _recoveryAction = action;
+      }
     });
   }
 
@@ -225,7 +243,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _loading = true;
       _message = null;
+      _googleMessage = null;
       _recoveryAction = null;
+      _googleRecoveryAction = null;
       _retryAction = _sendPasswordReset;
     });
     try {
@@ -243,6 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
           isGoogle: false,
           isCreatingAccount: false,
         ),
+        isGoogle: false,
       );
     } catch (error) {
       debugPrint('Password reset error: $error');
@@ -252,6 +273,7 @@ class _LoginScreenState extends State<LoginScreen> {
           isGoogle: false,
           isCreatingAccount: false,
         ),
+        isGoogle: false,
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -263,18 +285,27 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _mode = mode;
       _message = null;
+      _googleMessage = null;
       _recoveryAction = null;
+      _googleRecoveryAction = null;
     });
   }
 
-  Future<void> _runRecoveryAction() async {
-    switch (_recoveryAction) {
+  Future<void> _runRecoveryAction({bool isGoogle = false}) async {
+    final action = isGoogle ? _googleRecoveryAction : _recoveryAction;
+    switch (action) {
       case AuthRecoveryAction.retry:
         await _retryAction?.call();
         break;
       case AuthRecoveryAction.useEmail:
       case AuthRecoveryAction.signIn:
         _switchMode(_AuthMode.signIn);
+        break;
+      case AuthRecoveryAction.forgotPassword:
+        await _sendPasswordReset();
+        break;
+      case AuthRecoveryAction.continueOffline:
+        await _goHome();
         break;
       case null:
         break;
@@ -306,12 +337,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return null;
   }
 
-  String? get _noticeActionLabel => switch (_recoveryAction) {
+  String? _actionLabel(AuthRecoveryAction? action) => switch (action) {
     AuthRecoveryAction.retry => 'Réessayer',
     AuthRecoveryAction.useEmail => 'Utiliser mon e-mail',
     AuthRecoveryAction.signIn => 'Se connecter',
+    AuthRecoveryAction.forgotPassword => 'Mot de passe oublié ?',
+    AuthRecoveryAction.continueOffline => 'Continuer sans compte',
     null => null,
   };
+  String? get _noticeActionLabel => _actionLabel(_recoveryAction);
+  String? get _googleNoticeActionLabel => _actionLabel(_googleRecoveryAction);
 
   @override
   Widget build(BuildContext context) {
@@ -370,6 +405,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 22),
                     _GoogleButton(loading: _loading, onPressed: _googleLogin),
+                    if (_googleMessage != null) ...[
+                      const SizedBox(height: 12),
+                      InlineNotice(
+                        type: _googleNoticeType,
+                        message: _googleMessage!,
+                        actionLabel: _googleNoticeActionLabel,
+                        onAction: _googleRecoveryAction == null
+                            ? null
+                            : () => _runRecoveryAction(isGoogle: true),
+                      ),
+                    ],
                     const SizedBox(height: 18),
                     Row(
                       children: [
@@ -447,6 +493,13 @@ class _LoginScreenState extends State<LoginScreen> {
                               hasLetter: _hasLetter,
                               hasDigit: _hasDigit,
                             ),
+                            const SizedBox(height: 8),
+                            _PasswordStrength(value: [
+                              _hasEightCharacters,
+                              _hasLetter,
+                              _hasDigit,
+                              _password.length >= 12,
+                            ].where((value) => value).length),
                             const SizedBox(height: 12),
                             AppTextField(
                               controller: _confirmation,
@@ -533,7 +586,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     Center(
                       child: Text(
-                        'En continuant, tu acceptes les conditions d’utilisation et la politique de confidentialité.',
+                        'Le mode hors ligne reste disponible sans compte.',
                         textAlign: TextAlign.center,
                         style: Theme.of(
                           context,
@@ -547,6 +600,28 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PasswordStrength extends StatelessWidget {
+  const _PasswordStrength({required this.value});
+  final int value;
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.primary;
+    return Row(
+      children: List.generate(4, (index) => Expanded(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 5,
+          margin: EdgeInsets.only(right: index == 3 ? 0 : 4),
+          decoration: BoxDecoration(
+            color: index < value ? color : color.withValues(alpha: .16),
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      )),
     );
   }
 }
