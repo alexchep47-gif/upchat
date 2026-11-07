@@ -164,13 +164,59 @@ class StorageService {
     await _secureSettingsBox.put(AppConstants.keyUserPhone, normalized);
   }
 
+  /// Normalise un numéro pour stockage / lookup.
+  /// - garde le + si présent
+  /// - Cameroun : 9 chiffres commençant par 6 → +237…
+  /// - 237 + 9 chiffres → +237…
   static String normalizePhone(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return '';
-    final hasPlus = trimmed.startsWith('+');
-    final digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    var digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.isEmpty) return '';
-    return hasPlus ? '+$digits' : digits;
+
+    // 00 préfixe international
+    if (digits.startsWith('00') && digits.length > 4) {
+      digits = digits.substring(2);
+    }
+
+    // Cameroun local 6XX XXX XXX (9 chiffres)
+    if (digits.length == 9 && digits.startsWith('6')) {
+      return '+237$digits';
+    }
+    // Déjà avec indicatif 237 sans +
+    if (digits.length == 12 && digits.startsWith('237')) {
+      return '+$digits';
+    }
+    // Autre format international saisi sans +
+    if (digits.length >= 10 && digits.length <= 15 && !trimmed.startsWith('+')) {
+      // Si l'utilisateur a collé 2376… déjà couvert ; sinon on conserve les chiffres
+      // mais on préfère le + pour les lookups serveur.
+      if (digits.startsWith('237') && digits.length >= 12) {
+        return '+${digits.substring(0, 12)}';
+      }
+    }
+    if (trimmed.startsWith('+') || digits.length >= 10) {
+      return '+$digits';
+    }
+    return digits;
+  }
+
+  /// Variantes à essayer côté lookup (même personne, saisie différente).
+  static List<String> phoneLookupCandidates(String raw) {
+    final primary = normalizePhone(raw);
+    if (primary.isEmpty) return const [];
+    final digits = primary.replaceAll(RegExp(r'[^0-9]'), '');
+    final set = <String>{primary, digits, '+$digits'};
+    if (digits.startsWith('237') && digits.length >= 12) {
+      final local = digits.substring(3);
+      set.add(local);
+      set.add('+237$local');
+      set.add('237$local');
+    } else if (digits.length == 9 && digits.startsWith('6')) {
+      set.add('+237$digits');
+      set.add('237$digits');
+    }
+    return set.where((e) => e.isNotEmpty).toList();
   }
 
   static bool get isOnboardingDone =>
