@@ -49,6 +49,10 @@ dependencies:
   google_fonts: ^6.2.1
   web: ^1.1.1
 
+# Xcode 26 compatibility: 2.12.2+ uses AVFoundation isolation APIs unavailable on the runner.
+dependency_overrides:
+  video_player_avfoundation: 2.12.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
