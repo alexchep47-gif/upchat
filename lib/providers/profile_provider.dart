@@ -26,7 +26,6 @@ class ProfileProvider extends ChangeNotifier {
     _bio = StorageService.userBio;
     _phoneNumber = StorageService.userPhone;
     final path = StorageService.userPhotoPath;
-    // Vérifie que le fichier existe encore (Android)
     if (path != null && !kIsWeb) {
       final file = File(path);
       if (file.existsSync()) {
@@ -44,7 +43,7 @@ class ProfileProvider extends ChangeNotifier {
   Future<void> updateName(String newName) async {
     _name = newName.trim().isEmpty ? 'Utilisateur' : newName.trim();
     await StorageService.setUserName(_name);
-    await InternetService().reregister();
+    await InternetService().reregister(force: true);
     notifyListeners();
   }
 
@@ -61,7 +60,13 @@ class ProfileProvider extends ChangeNotifier {
             : StorageService.normalizePhone(phone);
     _phoneNumber = normalized;
     await StorageService.setUserPhone(normalized);
-    await InternetService().reregister();
+    // Publie le numéro sur le relais même si le toggle internet était OFF
+    try {
+      await InternetService().reregister(force: true);
+    } catch (e) {
+      debugPrint('ProfileProvider: publication numéro échouée: $e');
+      // On garde le numéro local ; l'utilisateur pourra réessayer avec internet
+    }
     notifyListeners();
   }
 

@@ -12,13 +12,6 @@ import 'storage_service.dart';
 import 'firebase_auth_service.dart';
 
 /// Mode internet optionnel (hybride)
-///
-/// Architecture téléphone :
-/// 1. L'utilisateur enregistre son numéro (optionnel offline, recommandé en ligne)
-/// 2. À l'activation du mode internet → POST /register { userId, phone, name }
-/// 3. Lookup contact → GET /lookup?phone=...
-/// 4. Messages relayés via le serveur de signalisation quand les deux sont en ligne
-/// 5. Le mode offline (Nearby) reste prioritaire en local
 class InternetService {
   static final InternetService _instance = InternetService._internal();
   factory InternetService() => _instance;
@@ -39,10 +32,7 @@ class InternetService {
   Future<bool>? _reconnectFuture;
   String? _serverAuthMode;
 
-  // File d'attente des messages à envoyer quand on repasse en ligne
   final List<Map<String, dynamic>> _outbox = [];
-
-  // Contacts connus en mode internet (userId → lastSeen)
   final Map<String, DateTime> _onlinePeers = {};
 
   Function(MessageModel)? onMessageReceived;
@@ -92,7 +82,6 @@ class InternetService {
     };
   }
 
-  /// Active / désactive le mode internet
   Future<void> setEnabled(bool value) async {
     _enabled = value;
     await StorageService.settings.put(AppConstants.keyInternetMode, value);
@@ -154,7 +143,6 @@ class InternetService {
     debugPrint('InternetService: mode hybride arrêté');
   }
 
-  /// Connexion + enregistrement sur le serveur de signalisation
   Future<void> _connectSignaling() async {
     try {
       await _refreshServerAuthMode();
@@ -179,20 +167,25 @@ class InternetService {
       if (res.statusCode >= 200 && res.statusCode < 300) {
         _isConnectedToSignaling = true;
         _onlinePeers[StorageService.userId] = DateTime.now();
-        debugPrint('InternetService: enregistré sur signalisation');
+        debugPrint('InternetService: enregistré sur signalisation (phone=${phone ?? "-"})');
+      } else if (res.statusCode == 409) {
+        // Numéro déjà pris par un autre userId
+        debugPrint('InternetService: register 409 — numéro déjà associé à un autre compte');
+        _isConnectedToSignaling = false;
+        throw StateError(
+          'Ce numéro est déjà lié à un autre compte UpChat sur le serveur.',
+        );
       } else {
-        debugPrint('InternetService: register HTTP ${res.statusCode}');
+        debugPrint('InternetService: register HTTP ${res.statusCode} ${res.body}');
         _isConnectedToSignaling = false;
       }
     } catch (e) {
       debugPrint('InternetService: erreur signalisation: $e');
       _isConnectedToSignaling = false;
+      if (e is StateError) rethrow;
     }
   }
 
-  /// Le relais expose son mode d'authentification afin que les anciennes
-  /// installations utilisent leur secret d'appareil et qu'un serveur migré
-  /// vers Firebase Admin reçoive un ID token Firebase.
   Future<void> _refreshServerAuthMode() async {
     try {
       final response = await http
@@ -273,8 +266,6 @@ class InternetService {
     });
   }
 
-  /// Ré-authentifie une session expirée sans lancer plusieurs reconnexions
-  /// concurrentes.
   Future<bool> _reconnectSignaling() {
     final active = _reconnectFuture;
     if (active != null) return active;
@@ -343,21 +334,25 @@ class InternetService {
     }
   }
 
-  /// Recherche un utilisateur par numéro de téléphone (réseau + cache local)
+  /// Recherche un utilisateur par numéro (toutes variantes 6… / +237…).
   Future<UserModel?> lookupByPhone(
     String rawPhone, {
     bool requireRegisteredAccount = false,
   }) async {
-    final phone = StorageService.normalizePhone(rawPhone);
-    if (phone.isEmpty) return null;
+    final candidates = StorageService.phoneLookupCandidates(rawPhone);
+    if (candidates.isEmpty) return null;
 
-    // Cache local d'abord
-    final local = _directory.findLocal(phone);
-    if (!requireRegisteredAccount && local != null) return local;
+    // Cache local sur chaque variante
+    for (final phone in candidates) {
+      final local = _directory.findLocal(phone);
+      if (local != null) {
+        if (!requireRegisteredAccount) return local;
+        // Même en mode strict, un contact local issu d'un lookup serveur suffit
+        if (local.id.isNotEmpty) return local;
+      }
+    }
 
     if (!_isOnline || !_isConnectedToSignaling) {
-      // Phone verification is an explicit online action. It must not depend
-      // on the optional background relay toggle being enabled beforehand.
       await _connectSignaling();
       if (_isConnectedToSignaling) {
         _isOnline = true;
@@ -375,6 +370,8 @@ class InternetService {
     }
 
     try {
+      // Une seule requête avec le format canonique ; le serveur élargit aussi
+      final phone = candidates.first;
       final res = await http
           .get(_uri('/api/lookup', {'phone': phone}), headers: await _headers)
           .timeout(const Duration(seconds: 10));
@@ -382,10 +379,12 @@ class InternetService {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         if (data['found'] == true) {
+          final resolvedPhone =
+              data['phone'] as String? ?? StorageService.normalizePhone(rawPhone);
           final user = UserModel(
             id: data['userId'] as String,
-            name: data['name'] as String? ?? phone,
-            phoneNumber: phone,
+            name: data['name'] as String? ?? resolvedPhone,
+            phoneNumber: resolvedPhone,
             lastSeen: data['lastSeen'] != null
                 ? DateTime.tryParse(data['lastSeen'] as String) ??
                       DateTime.now()
@@ -398,7 +397,7 @@ class InternetService {
         await _connectSignaling();
         if (_isConnectedToSignaling) {
           return await lookupByPhone(
-            phone,
+            rawPhone,
             requireRegisteredAccount: requireRegisteredAccount,
           );
         }
@@ -407,18 +406,33 @@ class InternetService {
       }
     } catch (e) {
       debugPrint('InternetService: lookup error: $e');
+      if (e is StateError) rethrow;
     }
     return null;
   }
 
-  /// Met à jour l'enregistrement (après changement de nom / téléphone)
-  Future<void> reregister() async {
-    if (_enabled && _isOnline) {
-      await _connectSignaling();
+  /// Ré-enregistre sur le serveur même si le mode internet n'était pas actif.
+  /// Nécessaire après saisie du numéro dans le profil.
+  Future<void> reregister({bool force = false}) async {
+    if (!force && !(_enabled && _isOnline)) {
+      // Tentative best-effort : publier le numéro dès qu'on a du réseau
+      try {
+        await _connectSignaling();
+        if (_isConnectedToSignaling) {
+          _isOnline = true;
+          if (_enabled) {
+            _startHeartbeat();
+            _startInboxPolling();
+          }
+        }
+      } catch (e) {
+        debugPrint('InternetService: reregister best-effort: $e');
+      }
+      return;
     }
+    await _connectSignaling();
   }
 
-  /// Envoie un message via internet (ou le met en file d'attente)
   Future<bool> sendMessage({
     String? messageId,
     required String targetUserId,
@@ -439,9 +453,6 @@ class InternetService {
       if (targetPhone != null) 'targetPhone': targetPhone,
       'messageType': type.name,
       'content': text,
-      // Un chemin local n'est jamais transmissible au serveur. Les médias
-      // distants devront utiliser un mediaId/URL chiffré dans une prochaine
-      // étape du backend.
       if (mediaPath != null &&
           (mediaPath.startsWith('https://') || mediaPath.startsWith('http://')))
         'mediaPath': mediaPath,
@@ -522,8 +533,6 @@ class InternetService {
         if (ok) {
           await StorageService.messages.delete('outbox_${payload['id']}');
         } else if (!_outbox.any((item) => item['id'] == payload['id'])) {
-          // Ne pas perdre le message si le relais refuse temporairement
-          // la session ou si la reconnexion échoue.
           _outbox.add(payload);
         }
       }
@@ -532,7 +541,6 @@ class InternetService {
     }
   }
 
-  /// Appelle quand la connectivité change
   Future<void> onConnectivityChange(bool online) async {
     final wasOnline = _isOnline;
     _isOnline = online;
@@ -558,7 +566,6 @@ class InternetService {
     }
   }
 
-  /// Réception d'un message depuis le réseau
   void handleIncoming(Map<String, dynamic> map) {
     final message = MessageModel(
       id: map['id'] as String? ?? _uuid.v4(),
@@ -580,7 +587,6 @@ class InternetService {
       status: MessageStatus.delivered,
     );
 
-    // Enrichit le répertoire local si un téléphone expéditeur est fourni
     final senderPhone = map['senderPhone'] as String?;
     if (senderPhone != null && senderPhone.isNotEmpty) {
       _directory.upsert(
