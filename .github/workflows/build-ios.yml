@@ -87,26 +87,20 @@ jobs:
           rm -rf symbols build/ios/ipa build/ios/archive /tmp/upchat-payload
           mkdir -p symbols build/ios/ipa
 
-          # 1) Archive Flutter sans signature
+          # 1) Compiler l’application iOS sans signature. `flutter build ipa`
+          # demande désormais une équipe Apple même avec --no-codesign ;
+          # Sideloadly n’en a pas besoin à ce stade.
           if [ -n "$GOOGLE_SERVER_CLIENT_ID" ]; then
-            flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols "--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
+            flutter build ios --release --no-codesign --obfuscate --split-debug-info=./symbols "--dart-define=GOOGLE_SERVER_CLIENT_ID=$GOOGLE_SERVER_CLIENT_ID"
           else
-            flutter build ipa --release --no-codesign --obfuscate --split-debug-info=./symbols
+            flutter build ios --release --no-codesign --obfuscate --split-debug-info=./symbols
           fi
 
-          # 2) Localiser le .app dans le xcarchive
-          ARCHIVE=$(find build/ios/archive -maxdepth 1 -name '*.xcarchive' -print -quit)
-          if [ -z "$ARCHIVE" ]; then
-            echo "::error::Aucun xcarchive trouvé"
+          # 2) Localiser le .app produit par flutter build ios
+          APP="$GITHUB_WORKSPACE/build/ios/iphoneos/Runner.app"
+          if [ ! -d "$APP" ]; then
+            echo "::error::Aucun Runner.app trouvé"
             ls -laR build/ios || true
-            exit 1
-          fi
-          echo "Archive: $ARCHIVE"
-
-          APP=$(find "$ARCHIVE/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)
-          if [ -z "$APP" ]; then
-            echo "::error::Aucun .app dans le xcarchive"
-            ls -laR "$ARCHIVE/Products" || true
             exit 1
           fi
           echo "App: $APP"

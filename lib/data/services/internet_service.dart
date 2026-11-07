@@ -11,6 +11,14 @@ import 'phone_directory_service.dart';
 import 'storage_service.dart';
 import 'firebase_auth_service.dart';
 
+class InternetLookupException implements Exception {
+  final int? statusCode;
+  final String message;
+  const InternetLookupException(this.message, {this.statusCode});
+  @override
+  String toString() => message;
+}
+
 /// Mode internet optionnel (hybride)
 class InternetService {
   static final InternetService _instance = InternetService._internal();
