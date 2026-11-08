@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
@@ -150,6 +152,82 @@ class FirebaseAuthService {
       lastTechnicalError = error.toString();
       lastError = 'Connexion Google indisponible pour le moment.';
       debugPrint('FirebaseAuthService.signInWithGoogle: $error');
+      rethrow;
+    }
+  }
+
+  /// Envoie le SMS sur Android/iOS. Le Web utilise signInWithPhoneNumber.
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required void Function(String verificationId) codeSent,
+    void Function(PhoneAuthCredential credential)? verificationCompleted,
+    void Function(FirebaseAuthException error)? verificationFailed,
+    Duration timeout = const Duration(seconds: 60),
+  }) async {
+    if (kIsWeb) {
+      throw UnsupportedError('Le Web utilise signInWithPhoneNumber.');
+    }
+    if (!await initialize()) {
+      throw StateError(lastError ?? 'Service de connexion indisponible.');
+    }
+    final completer = Completer<void>();
+    await _auth!.verifyPhoneNumber(
+      phoneNumber: phoneNumber,
+      timeout: timeout,
+      verificationCompleted: (credential) => verificationCompleted?.call(credential),
+      verificationFailed: (error) {
+        _rememberAuthException(error);
+        verificationFailed?.call(error);
+        if (!completer.isCompleted) completer.completeError(error);
+      },
+      codeSent: (verificationId, _) {
+        codeSent(verificationId);
+        if (!completer.isCompleted) completer.complete();
+      },
+      codeAutoRetrievalTimeout: (verificationId) {
+        if (!completer.isCompleted) {
+          codeSent(verificationId);
+          completer.complete();
+        }
+      },
+    );
+    return completer.future;
+  }
+
+  /// Envoie le SMS Web après le contrôle reCAPTCHA Firebase.
+  Future<ConfirmationResult> signInWithPhoneNumber(String phoneNumber) async {
+    if (!kIsWeb) {
+      throw UnsupportedError('Android/iOS utilisent verifyPhoneNumber.');
+    }
+    if (!await initialize()) {
+      throw StateError(lastError ?? 'Service de connexion indisponible.');
+    }
+    return _auth!.signInWithPhoneNumber(phoneNumber);
+  }
+
+  PhoneAuthCredential credential({
+    required String verificationId,
+    required String smsCode,
+  }) => PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+  Future<UserCredential> linkWithCredential(AuthCredential phoneCredential) async {
+    if (!await initialize()) {
+      throw StateError(lastError ?? 'Service de connexion indisponible.');
+    }
+    final user = _auth!.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Connecte-toi avant de vérifier ton numéro.',
+      );
+    }
+    try {
+      return await user.linkWithCredential(phoneCredential);
+    } on FirebaseAuthException catch (error) {
+      _rememberAuthException(error);
       rethrow;
     }
   }

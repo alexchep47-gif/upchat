@@ -7,6 +7,7 @@ import '../../widgets/responsive_content.dart';
 import '../../data/services/media_service.dart';
 import '../../providers/profile_provider.dart';
 import '../../widgets/profile_avatar.dart';
+import 'phone_verification_screen.dart';
 
 /// Écran de profil utilisateur
 class ProfileScreen extends StatefulWidget {
@@ -217,6 +218,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               helperText:
                   'Utilisé uniquement en mode internet pour te retrouver à distance',
             ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final verifiedPhone = await Navigator.of(context).push<String>(
+                MaterialPageRoute(
+                  builder: (_) => PhoneVerificationScreen(
+                    initialPhone: _phoneController.text,
+                  ),
+                ),
+              );
+              if (verifiedPhone != null && mounted) {
+                _phoneController.text = verifiedPhone;
+                setState(() {});
+              }
+            },
+            icon: const Icon(Icons.verified_user_outlined),
+            label: Text(profile.phoneNumber == null
+                ? 'Vérifier mon numéro par SMS'
+                : 'Re-vérifier mon numéro'),
           ),
           const SizedBox(height: 16),
           TextField(
