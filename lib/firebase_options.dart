@@ -6,13 +6,13 @@ import 'package:flutter/foundation.dart';
 
 class DefaultFirebaseOptions {
   // Configuration publique de l'application Web UpChat.
-  static const _webApiKey = 'AIzaSyABzrVAHIyHs5u2usw36IJ7rn9EXRI7PbE';
+  static const _webApiKey = 'AIzaSyABzrVAHIHs5u2usw36IJ7rn9EXRI7PbE';
   static const _webAuthDomain = 'upchat-android.firebaseapp.com';
   static const _webProjectId = 'upchat-android';
   static const _webStorageBucket = 'upchat-android.firebasestorage.app';
   static const _webMessagingSenderId = '451915075042';
-  static const _webAppId = '1:451915075042:web:8638d4392781d5c4937dbb';
-  static const _webMeasurementId = 'G-LRSXTTBDHY';
+  static const _webAppId = '1:451915075042:web:370d5f7d2380eb8b937dbb';
+  static const _webMeasurementId = 'G-VVKE83P741';
 
   static const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const appId = String.fromEnvironment('FIREBASE_APP_ID');
