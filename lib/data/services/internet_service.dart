@@ -370,7 +370,7 @@ class InternetService {
     }
     if (!_isOnline || !_isConnectedToSignaling) {
       if (requireRegisteredAccount) {
-        throw StateError(
+        throw const InternetLookupException(
           'Le serveur UpChat est indisponible pour vérifier ce numéro.',
         );
       }

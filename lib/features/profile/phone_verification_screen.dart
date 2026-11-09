@@ -121,7 +121,11 @@ class _PhoneVerificationScreenState extends State<PhoneVerificationScreen> {
       }
       return error.message ?? 'La vérification du numéro a échoué.';
     }
-    return error.toString();
+    if (error is StateError || error is UnsupportedError) {
+      return 'La vérification par SMS n’est pas disponible pour l’instant. '
+          'Tu peux utiliser UpChat sans numéro, ou ajouter un contact avec son code QR.';
+    }
+    return 'La vérification par SMS a échoué. Réessaie plus tard ou continue sans numéro.';
   }
 
   @override

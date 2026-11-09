@@ -59,6 +59,7 @@ class AppConstants {
   static const String keyNotificationVibration =
       'settings_notification_vibration';
   static const String keyNotificationPreview = 'settings_notification_preview';
+  static const String keyEmergencyWipe = 'settings_emergency_wipe';
   static const String keyEnterToSend = 'settings_enter_to_send';
   static const String keyAutoDownloadMedia = 'settings_auto_download_media';
   static const String keySaveToGallery = 'settings_save_to_gallery';

@@ -263,6 +263,28 @@ class StorageService {
     await _conversationsBox.clear();
   }
 
+  /// Effacement local irréversible : messages, profils, annuaire et identité.
+  /// Une nouvelle identité d’appareil est créée immédiatement après.
+  static Future<void> emergencyWipe() async {
+    await Future.wait([
+      _messagesBox.clear(),
+      _conversationsBox.clear(),
+      _usersBox.clear(),
+      _groupsBox.clear(),
+      _storiesBox.clear(),
+      _phoneDirectoryBox.clear(),
+    ]);
+    await _secureSettingsBox.delete(AppConstants.keyUserName);
+    await _secureSettingsBox.delete(AppConstants.keyUserBio);
+    await _secureSettingsBox.delete(AppConstants.keyUserPhoto);
+    await _secureSettingsBox.delete(AppConstants.keyUserPhone);
+    await _secureSettingsBox.put(AppConstants.keyUserId, const Uuid().v4());
+    await _secureSettingsBox.put(
+      AppConstants.keyDeviceSecret,
+      base64Url.encode(List<int>.generate(32, (_) => Random.secure().nextInt(256))),
+    );
+  }
+
   static Future<void> close() async {
     await Hive.close();
   }

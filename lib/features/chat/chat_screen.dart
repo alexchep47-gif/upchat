@@ -86,6 +86,15 @@ class _ChatScreenState extends State<ChatScreen> {
     return widget.peerId;
   }
 
+  String _transportLabel(NearbyProvider nearby, bool peerTyping) {
+    if (peerTyping) return 'écrit…';
+    if (kIsWeb) return 'via internet';
+    if (nearby.connectedEndpoints.values.contains(widget.peerId)) {
+      return 'à proximité';
+    }
+    return 'en attente de liaison';
+  }
+
   void _onTypingChanged() {
     final endpointId = _resolveEndpointId();
     if (endpointId == null) return;
@@ -210,6 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final glass = AppGlass.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chat = context.watch<ChatProvider>();
+    final nearby = context.watch<NearbyProvider>();
     final settings = context.watch<SettingsProvider>();
     final media = MediaQuery.of(context);
     final bottomInset = media.viewInsets.bottom;
@@ -397,7 +407,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                           ),
                                         ),
                                         Text(
-                                          peerTyping ? 'écrit…' : 'à proximité',
+                                          _transportLabel(nearby, peerTyping),
                                           style: TextStyle(
                                             fontSize: 11,
                                             fontStyle: peerTyping

@@ -9,11 +9,11 @@ import '../data/services/storage_service.dart';
 /// après redémarrage et entre les écrans qui utilisent le même provider.
 class SettingsProvider extends ChangeNotifier {
   bool _readReceipts = true;
-  bool _onlineStatus = true;
-  bool _typingIndicators = true;
+  bool _onlineStatus = false;
+  bool _typingIndicators = false;
   bool _notificationSounds = true;
   bool _notificationVibration = true;
-  bool _notificationPreview = true;
+  bool _notificationPreview = false;
   bool _enterToSend = false;
   bool _autoDownloadMedia = true;
   bool _saveToGallery = false;
@@ -41,11 +41,11 @@ class SettingsProvider extends ChangeNotifier {
   void _load() {
     final box = StorageService.settings;
     _readReceipts = box.get(AppConstants.keyReadReceipts, defaultValue: true) as bool;
-    _onlineStatus = box.get(AppConstants.keyOnlineStatus, defaultValue: true) as bool;
-    _typingIndicators = box.get(AppConstants.keyTypingIndicators, defaultValue: true) as bool;
+    _onlineStatus = box.get(AppConstants.keyOnlineStatus, defaultValue: false) as bool;
+    _typingIndicators = box.get(AppConstants.keyTypingIndicators, defaultValue: false) as bool;
     _notificationSounds = box.get(AppConstants.keyNotificationSounds, defaultValue: true) as bool;
     _notificationVibration = box.get(AppConstants.keyNotificationVibration, defaultValue: true) as bool;
-    _notificationPreview = box.get(AppConstants.keyNotificationPreview, defaultValue: true) as bool;
+    _notificationPreview = box.get(AppConstants.keyNotificationPreview, defaultValue: false) as bool;
     _enterToSend = box.get(AppConstants.keyEnterToSend, defaultValue: false) as bool;
     _autoDownloadMedia = box.get(AppConstants.keyAutoDownloadMedia, defaultValue: true) as bool;
     _saveToGallery = box.get(AppConstants.keySaveToGallery, defaultValue: false) as bool;

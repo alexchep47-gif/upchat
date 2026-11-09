@@ -298,10 +298,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _toggle(
                 icon: Icons.visibility_outlined,
-                title: 'Aperçu du message',
-                subtitle: 'Afficher le contenu dans les notifications',
-                value: settings.notificationPreview,
-                onChanged: settings.setNotificationPreview,
+                title: 'Masquer les aperçus de messages',
+                subtitle: 'Ne pas afficher le contenu sur l’écran verrouillé',
+                value: !settings.notificationPreview,
+                onChanged: (hide) => settings.setNotificationPreview(!hide),
               ),
             ]),
             _section('Discussions', Icons.chat_bubble_outline_rounded, [
@@ -438,6 +438,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(connectivity.statusLabel),
                 onTap: connectivity.internetModeEnabled ? connectivity.testNow : null,
               ),
+              ListTile(
+                leading: const Icon(Icons.health_and_safety_outlined),
+                title: const Text('Diagnostic technique'),
+                subtitle: const Text('Plateforme, URL, Firebase et dernière erreur'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pushNamed(context, AppRouter.diagnostic),
+              ),
             ]),
             _section('Apparence', Icons.palette_outlined, [
               RadioListTile<ThemeMode>(
@@ -492,6 +499,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ]),
+            _section('Zone de danger', Icons.warning_amber_rounded, [
+              ListTile(
+                leading: const Icon(Icons.delete_forever_outlined, color: AppColors.error),
+                title: const Text('Effacement d’urgence'),
+                subtitle: const Text('Supprime messages, données locales et identité de cet appareil'),
+                onTap: _confirmEmergencyWipe,
+              ),
+            ]),
           ],
         ),
       ),
@@ -524,6 +539,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Discussions effacées')));
+    }
+  }
+
+  Future<void> _confirmEmergencyWipe() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Effacer UpChat sur cet appareil ?'),
+        content: const Text(
+          'Cette action supprime définitivement les messages, conversations, contacts locaux, profil et identité cryptographique de cet appareil. Une nouvelle identité sera créée. Aucun retour arrière.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('EFFACER DÉFINITIVEMENT'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await StorageService.emergencyWipe();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Données locales et identité effacées.')),
+        );
+        setState(() {});
+      }
     }
   }
 

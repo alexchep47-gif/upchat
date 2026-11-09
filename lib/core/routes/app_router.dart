@@ -11,6 +11,7 @@ import '../../features/contacts/add_contact_by_phone_screen.dart';
 import '../../features/contacts/contact_detail_screen.dart';
 import '../../features/devices/connected_devices_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/settings/diagnostic_screen.dart';
 
 class AppRouter {
   static const String initialRoute = '/';
@@ -26,6 +27,7 @@ class AppRouter {
   static const String contactDetail = '/contact-detail';
   static const String connectedDevices = '/connected-devices';
   static const String login = '/login';
+  static const String diagnostic = '/diagnostic';
 
   static Route<dynamic> onGenerateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -88,6 +90,9 @@ class AppRouter {
 
       case login:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
+
+      case diagnostic:
+        return MaterialPageRoute(builder: (_) => const DiagnosticScreen());
 
       default:
         return MaterialPageRoute(
