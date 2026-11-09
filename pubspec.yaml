@@ -30,9 +30,13 @@ dependencies:
 
   # P2P Nearby Connections (Bluetooth + WiFi Direct)
   nearby_connections: ^4.1.1
+  flutter_blue_plus: ^2.3.15
 
   # Réseau (mode internet / signalisation)
   http: ^1.2.2
+  web_socket_channel: ^3.0.3
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.5.0
 
   # Médias
   image_picker: ^1.1.2

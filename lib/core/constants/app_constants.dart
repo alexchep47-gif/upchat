@@ -25,6 +25,8 @@ class AppConstants {
     'UPCHAT_SERVER_URL',
     defaultValue: 'https://upchat-signal.onrender.com',
   );
+  static const String relayWebSocketPath = '/ws';
+  static const String relayProtocol = 'upchat.relay.v1';
 
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);

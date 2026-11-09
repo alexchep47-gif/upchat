@@ -12,6 +12,7 @@ import '../../features/contacts/contact_detail_screen.dart';
 import '../../features/devices/connected_devices_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/settings/diagnostic_screen.dart';
+import '../../features/contacts/qr_identity_screen.dart';
 
 class AppRouter {
   static const String initialRoute = '/';
@@ -28,6 +29,7 @@ class AppRouter {
   static const String connectedDevices = '/connected-devices';
   static const String login = '/login';
   static const String diagnostic = '/diagnostic';
+  static const String qrIdentity = '/qr-identity';
 
   static Route<dynamic> onGenerateRoute(RouteSettings routeSettings) {
     switch (routeSettings.name) {
@@ -93,6 +95,9 @@ class AppRouter {
 
       case diagnostic:
         return MaterialPageRoute(builder: (_) => const DiagnosticScreen());
+
+      case qrIdentity:
+        return MaterialPageRoute(builder: (_) => const QrIdentityScreen());
 
       default:
         return MaterialPageRoute(

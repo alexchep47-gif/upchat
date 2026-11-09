@@ -243,6 +243,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () =>
                     Navigator.pushNamed(context, AppRouter.connectedDevices),
               ),
+              ListTile(
+                leading: const Icon(Icons.qr_code_2_rounded),
+                title: const Text('Identité locale par QR'),
+                subtitle: const Text('Ajouter un contact sans numéro de téléphone'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => Navigator.pushNamed(context, AppRouter.qrIdentity),
+              ),
             ]),
             _section('Confidentialité', Icons.lock_outline_rounded, [
               SwitchListTile.adaptive(
