@@ -298,10 +298,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _toggle(
                 icon: Icons.visibility_outlined,
-                title: 'Masquer les aperçus de messages',
-                subtitle: 'Ne pas afficher le contenu sur l’écran verrouillé',
-                value: !settings.notificationPreview,
-                onChanged: (hide) => settings.setNotificationPreview(!hide),
+                title: 'Aperçu du message',
+                subtitle: 'Afficher le contenu dans les notifications',
+                value: settings.notificationPreview,
+                onChanged: settings.setNotificationPreview,
               ),
             ]),
             _section('Discussions', Icons.chat_bubble_outline_rounded, [
