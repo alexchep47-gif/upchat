@@ -73,6 +73,7 @@ class MeshService {
       'content': text,
       'hop': 1,
       'maxHops': maxHops,
+      'ttl': maxHops,
       'createdAt': DateTime.now().toIso8601String(),
     };
 
@@ -106,6 +107,14 @@ class MeshService {
     final targetUserId = payload['targetUserId'] as String?;
     final hop = (payload['hop'] as int? ?? 1) + 1;
     final maxHops = payload['maxHops'] as int? ?? MeshService.maxHops;
+    final ttl = (payload['ttl'] as int? ?? maxHops) - 1;
+    final createdAt = DateTime.tryParse(payload['createdAt'] as String? ?? '');
+    if (ttl < 0 ||
+        (createdAt != null &&
+            DateTime.now().toUtc().difference(createdAt.toUtc()) >
+                const Duration(days: 1))) {
+      return;
+    }
 
     // Est-ce pour moi ?
     if (targetUserId == StorageService.userId) {
@@ -134,6 +143,7 @@ class MeshService {
     if (hop <= maxHops) {
       final nextPayload = Map<String, dynamic>.from(payload);
       nextPayload['hop'] = hop;
+      nextPayload['ttl'] = ttl;
 
       for (final endpointId in _nearby.connectedEndpoints.keys) {
         // Ne pas renvoyer à l'émetteur original si possible

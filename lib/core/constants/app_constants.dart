@@ -28,6 +28,13 @@ class AppConstants {
   static const String relayWebSocketPath = '/ws';
   static const String relayProtocol = 'upchat.relay.v1';
 
+  // Manifeste HTTPS public de mise à jour. Remplaçable par --dart-define.
+  static const String updateManifestUrl = String.fromEnvironment(
+    'UPCHAT_UPDATE_MANIFEST_URL',
+    defaultValue:
+        'https://raw.githubusercontent.com/alexchep47-gif/upchat/main/update-manifest.json',
+  );
+
   // Durées
   static const Duration storyExpiration = Duration(hours: 24);
   static const Duration discoveryTimeout = Duration(seconds: 30);

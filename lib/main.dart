@@ -11,6 +11,7 @@ import 'core/utils/web_theme_color.dart';
 import 'data/services/storage_service.dart';
 import 'data/services/firebase_auth_service.dart';
 import 'data/services/cleanup_service.dart';
+import 'data/services/notification_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/profile_provider.dart';
 import 'providers/nearby_provider.dart';
@@ -44,6 +45,7 @@ void main() {
 Future<void> _initializeLocalOnly() async {
   await Hive.initFlutter();
   await StorageService.init();
+  await NotificationService.instance.initialize();
   if (StorageService.autoCleanup) {
     unawaited(CleanupService().run());
   }

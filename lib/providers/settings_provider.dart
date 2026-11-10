@@ -13,7 +13,7 @@ class SettingsProvider extends ChangeNotifier {
   bool _typingIndicators = true;
   bool _notificationSounds = true;
   bool _notificationVibration = true;
-  bool _notificationPreview = true;
+  bool _notificationPreview = false;
   bool _enterToSend = false;
   bool _autoDownloadMedia = true;
   bool _saveToGallery = false;
@@ -45,7 +45,7 @@ class SettingsProvider extends ChangeNotifier {
     _typingIndicators = box.get(AppConstants.keyTypingIndicators, defaultValue: true) as bool;
     _notificationSounds = box.get(AppConstants.keyNotificationSounds, defaultValue: true) as bool;
     _notificationVibration = box.get(AppConstants.keyNotificationVibration, defaultValue: true) as bool;
-    _notificationPreview = box.get(AppConstants.keyNotificationPreview, defaultValue: true) as bool;
+    _notificationPreview = box.get(AppConstants.keyNotificationPreview, defaultValue: false) as bool;
     _enterToSend = box.get(AppConstants.keyEnterToSend, defaultValue: false) as bool;
     _autoDownloadMedia = box.get(AppConstants.keyAutoDownloadMedia, defaultValue: true) as bool;
     _saveToGallery = box.get(AppConstants.keySaveToGallery, defaultValue: false) as bool;

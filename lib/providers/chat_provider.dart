@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
@@ -10,6 +11,8 @@ import '../data/services/mesh_service.dart';
 import '../data/services/internet_service.dart';
 import '../data/services/phone_directory_service.dart';
 import '../data/services/offline_sync_service.dart';
+import '../data/services/signal_crypto_service.dart';
+import '../data/services/notification_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final Uuid _uuid = const Uuid();
@@ -18,6 +21,7 @@ class ChatProvider extends ChangeNotifier {
   final InternetService _internet = InternetService();
   final PhoneDirectoryService _phoneDir = PhoneDirectoryService();
   final OfflineSyncService _offline = OfflineSyncService.instance;
+  final SignalCryptoService _signal = SignalCryptoService.instance;
 
   final List<ConversationModel> _conversations = [];
   final Map<String, List<MessageModel>> _messages = {};
@@ -134,11 +138,20 @@ class ChatProvider extends ChangeNotifier {
     );
 
     _addLocalMessage(message, preview: text);
+    final wireText = await _encryptText(
+      remoteUserId: conversationId,
+      messageId: message.id,
+      plaintext: text,
+    );
+    if (wireText == null) {
+      _updateMessageStatus(message.id, MessageStatus.failed);
+      return;
+    }
     await _offline.enqueue(
       messageId: message.id,
       targetUserId: conversationId,
       conversationId: conversationId,
-      content: text,
+      content: wireText,
     );
 
     bool success = false;
@@ -147,7 +160,7 @@ class ChatProvider extends ChangeNotifier {
       success = await _nearby.sendTextMessage(
         endpointId: endpointId,
         conversationId: conversationId,
-        text: text,
+        text: wireText,
       );
     }
 
@@ -155,7 +168,7 @@ class ChatProvider extends ChangeNotifier {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
         conversationId: conversationId,
-        text: text,
+        text: wireText,
       );
     }
 
@@ -173,7 +186,7 @@ class ChatProvider extends ChangeNotifier {
           messageId: message.id,
           targetUserId: conversationId,
           conversationId: conversationId,
-          text: text,
+          text: wireText,
           targetPhone: phone,
         );
       }
@@ -308,6 +321,24 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
+  Future<String?> _encryptText({
+    required String remoteUserId,
+    required String messageId,
+    required String plaintext,
+  }) async {
+    try {
+      final envelope = await _signal.encrypt(
+        remoteUserId: remoteUserId,
+        messageId: messageId,
+        plaintext: plaintext,
+      );
+      return jsonEncode(envelope.toMap());
+    } catch (error) {
+      debugPrint('Signal: session absente ou chiffrement impossible: $error');
+      return null;
+    }
+  }
+
   void _onIncomingMessage(MessageModel message) {
     if (message.content.startsWith('{') &&
         message.content.contains('mesh_relay')) {
@@ -320,6 +351,45 @@ class ChatProvider extends ChangeNotifier {
       } catch (_) {}
     }
 
+    if (message.type == MessageType.text) {
+      unawaited(_decryptAndHandleIncoming(message));
+      return;
+    }
+
+    _storeIncomingMessage(message);
+  }
+
+  Future<void> _decryptAndHandleIncoming(MessageModel message) async {
+    try {
+      final raw = jsonDecode(message.content);
+      if (raw is! Map || raw['protocol'] != 'upchat.signal.v1') {
+        _storeIncomingMessage(message);
+        return;
+      }
+      final plaintext = await _signal.decrypt(
+        SignalEnvelope.fromMap(Map<String, dynamic>.from(raw)),
+      );
+      _storeIncomingMessage(
+        MessageModel(
+          id: message.id,
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          type: message.type,
+          content: plaintext,
+          mediaPath: message.mediaPath,
+          mediaSize: message.mediaSize,
+          status: message.status,
+          createdAt: message.createdAt,
+          isMe: message.isMe,
+        ),
+      );
+    } catch (error) {
+      debugPrint('Signal: message reçu non déchiffrable: $error');
+    }
+  }
+
+  void _storeIncomingMessage(MessageModel message) {
     // Chez le destinataire, la conversation = id de l’expéditeur
     // (pas le conversationId envoyé par l’émetteur, qui est souvent notre propre id).
     final peerId = message.isMe ? message.conversationId : message.senderId;
@@ -333,6 +403,7 @@ class ChatProvider extends ChangeNotifier {
     _messages[peerId]!.add(normalized);
     _updateConversationPreview(peerId, normalized.content, isIncoming: true);
     StorageService.messages.put(normalized.id, normalized.toMap());
+    unawaited(NotificationService.instance.showMessage(normalized));
     notifyListeners();
   }
 

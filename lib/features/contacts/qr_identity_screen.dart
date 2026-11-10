@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../data/services/signal_crypto_service.dart';
 import '../../data/services/storage_service.dart';
 
 class QrIdentityScreen extends StatefulWidget {
@@ -16,26 +17,37 @@ class QrIdentityScreen extends StatefulWidget {
 class _QrIdentityScreenState extends State<QrIdentityScreen> {
   bool _scannerOpen = false;
   bool _handled = false;
+  late final Future<Map<String, dynamic>> _bundleFuture;
 
-  String get _payload => jsonEncode({
-        'protocol': 'upchat.identity.v1',
-        'userId': StorageService.userId,
-        'name': StorageService.userName,
-      });
+  @override
+  void initState() {
+    super.initState();
+    _bundleFuture = SignalCryptoService.instance.publicPreKeyBundle();
+  }
 
-  void _handleCapture(BarcodeCapture capture) {
+  Future<void> _handleCapture(BarcodeCapture capture) async {
     if (_handled) return;
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
       if (raw == null) continue;
       try {
-        final data = jsonDecode(raw);
-        if (data is Map && data['protocol'] == 'upchat.identity.v1' &&
-            data['userId'] is String && (data['userId'] as String).isNotEmpty) {
-          _handled = true;
-          Navigator.pop(context, Map<String, dynamic>.from(data));
-          return;
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map || decoded['userId'] is! String ||
+            (decoded['userId'] as String).isEmpty ||
+            decoded['userId'] == StorageService.userId) {
+          continue;
         }
+        _handled = true;
+        final data = Map<String, dynamic>.from(decoded);
+        final bundle = data['signalBundle'];
+        if (bundle is Map && bundle['protocol'] == 'upchat.signal.v1') {
+          await SignalCryptoService.instance.trustBundle(
+            remoteUserId: data['userId'] as String,
+            bundle: Map<String, dynamic>.from(bundle),
+          );
+        }
+        if (mounted) Navigator.pop(context, data);
+        return;
       } catch (_) {
         // Le scan reste silencieux tant que le QR n'est pas un QR UpChat.
       }
@@ -54,17 +66,33 @@ class _QrIdentityScreenState extends State<QrIdentityScreen> {
             style: Theme.of(context).textTheme.bodyLarge,
           ),
           const SizedBox(height: 20),
-          Center(
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: QrImageView(
-                  data: _payload,
-                  size: 240,
-                  semanticsLabel: 'Identité locale UpChat',
+          FutureBuilder<Map<String, dynamic>>(
+            future: _bundleFuture,
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const SizedBox(
+                  height: 272,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return Center(
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: QrImageView(
+                      data: jsonEncode({
+                        'protocol': 'upchat.identity.v1',
+                        'userId': StorageService.userId,
+                        'name': StorageService.userName,
+                        'signalBundle': snapshot.data,
+                      }),
+                      size: 240,
+                      semanticsLabel: 'Identité locale UpChat et clés Signal',
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           Text('Identifiant : ${StorageService.userId}', textAlign: TextAlign.center),

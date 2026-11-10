@@ -5,6 +5,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/routes/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/services/cleanup_service.dart';
+import '../../data/services/app_update_service.dart';
+import '../../data/services/notification_service.dart';
 import '../../data/services/storage_service.dart';
 import '../../providers/biometric_lock_provider.dart';
 import '../../providers/connectivity_provider.dart';
@@ -23,10 +25,49 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _cleaning = false;
+  bool _checkingUpdate = false;
+  AppUpdateInfo? _availableUpdate;
   late bool _autoCleanup;
   late bool _autoPlayStories;
   late int _storyDuration;
   int _versionTaps = 0;
+
+  Future<void> _checkForUpdate() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    final update = await AppUpdateService.check();
+    if (!mounted) return;
+    setState(() {
+      _checkingUpdate = false;
+      _availableUpdate = update;
+    });
+    if (update == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('UpChat est déjà à jour ou le serveur est indisponible.')),
+      );
+      return;
+    }
+    final opened = await AppUpdateService.open(update);
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Impossible d’ouvrir la page de mise à jour.')),
+      );
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    final granted = await NotificationService.instance.requestPermission();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          granted
+              ? 'Notifications autorisées.'
+              : 'Notifications refusées. Tu peux les activer dans les réglages du téléphone.',
+        ),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -289,6 +330,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ]),
             _section('Notifications', Icons.notifications_none_rounded, [
+              ListTile(
+                leading: const Icon(Icons.notifications_active_outlined),
+                title: const Text('Autoriser les notifications'),
+                subtitle: const Text(
+                  'La demande est faite uniquement après ton action',
+                ),
+                onTap: _requestNotificationPermission,
+              ),
               _toggle(
                 icon: Icons.volume_up_outlined,
                 title: 'Sons',
@@ -478,6 +527,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: 'Verre flou sur les barres et menus ; désactive-le pour économiser la batterie',
                 value: settings.transparentToolbar,
                 onChanged: settings.setTransparentToolbar,
+              ),
+            ]),
+            _section('Aide', Icons.help_outline_rounded, [
+              ListTile(
+                leading: _checkingUpdate
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.system_update_outlined),
+                title: const Text('Rechercher une mise à jour'),
+                subtitle: Text(
+                  _availableUpdate == null
+                      ? 'Version installée : ${AppConstants.appVersion}'
+                      : 'Version ${_availableUpdate!.latestVersion} disponible',
+                ),
+                onTap: _checkingUpdate ? null : _checkForUpdate,
               ),
             ]),
             _section('Stockage local', Icons.security_outlined, [

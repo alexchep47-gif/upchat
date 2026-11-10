@@ -89,13 +89,15 @@ class OfflineSyncService {
   }
 
   List<OfflineMessageEnvelope> pending() {
+    final now = DateTime.now().toUtc();
     return StorageService.messages.keys
         .where((key) => key.toString().startsWith(_prefix))
         .map((key) => StorageService.messages.get(key))
         .whereType<Map>()
         .map((map) => OfflineMessageEnvelope.fromMap(Map<String, dynamic>.from(map)))
         .whereType<OfflineMessageEnvelope>()
-        .where((item) => item.ttl > 0)
+        .where((item) =>
+            item.ttl > 0 && now.difference(item.createdAt.toUtc()) < const Duration(days: 7))
         .toList();
   }
 
