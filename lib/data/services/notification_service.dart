@@ -77,6 +77,12 @@ class NotificationService {
       iOS: darwinDetails,
     );
     final id = message.id.hashCode & 0x7fffffff;
-    await _plugin.show(id, message.senderName, body, details, payload: message.conversationId);
+    await _plugin.show(
+      id: id,
+      title: message.senderName,
+      body: body,
+      notificationDetails: details,
+      payload: message.conversationId,
+    );
   }
 }
