@@ -37,6 +37,9 @@ Secrets attendus :
 | `UPCHAT_KEY_ALIAS` | alias de la clé |
 | `UPCHAT_KEY_PASSWORD` | mot de passe de la clé |
 | `GH_PAT` | token GitHub limité aux dépôts nécessaires pour publier le site et déclencher Pages |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | JSON du compte de service Firebase pour déployer Hosting (recommandé) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` | même JSON encodé en Base64, alternative pratique pour GitHub |
+| `FIREBASE_TOKEN` | token Firebase CLI legacy, solution de repli uniquement |
 
 Le fichier `firebase_options.dart` doit contenir les mêmes `projectId`, `appId`, `apiKey` et `messagingSenderId` que les applications Firebase. Le build Web appelle `Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)` ; Android et iOS lisent leur configuration native injectée. L’initialisation Firebase reste hors du chemin critique de démarrage afin que le mode hors ligne s’ouvre sans réseau.
 
@@ -82,5 +85,7 @@ Les erreurs Google `ApiException: 10` et Firebase `CONFIGURATION_NOT_FOUND` sont
 6. Dans **Google Cloud console > APIs & Services**, vérifier que le client OAuth Android utilise `com.upchat.app` et la même empreinte SHA-1. Copier l’ID du client OAuth de type **Web application** dans le secret GitHub `GOOGLE_SERVER_CLIENT_ID`.
 7. Vérifier que l’API **Identity Toolkit API** est activée et que les restrictions de clé API autorisent l’application Android avec son package et son SHA-1. Si l’écran de consentement OAuth est en test, ajouter le compte de test.
 8. Relancer **Build Android and Web**, installer le nouvel APK release, désinstaller l’ancienne version si elle a une autre signature, puis retester Google et e-mail.
+
+Pour supprimer le message indiquant que le credential Firebase Hosting est absent, ajouter dans **Settings > Secrets and variables > Actions** le secret `FIREBASE_SERVICE_ACCOUNT_JSON` avec le JSON du compte de service du projet `upchat-android` (ou `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64`). Le workflow accepte aussi `FIREBASE_TOKEN`, mais le compte de service est préférable. Si aucun de ces secrets n’est configuré, le déploiement Firebase Hosting est ignoré avec une notice non bloquante ; Vercel et GitHub Pages continuent normalement.
 
 La CI accepte également `UPCHAT_KEYSTORE_BASE64`, `UPCHAT_KEYSTORE_PASSWORD`, `UPCHAT_KEY_ALIAS` et `UPCHAT_KEY_PASSWORD` pour conserver la compatibilité avec les secrets déjà configurés. Elle transmet `GOOGLE_SERVER_CLIENT_ID` et, si besoin, `UPCHAT_SERVER_URL` via `--dart-define` : ces valeurs ne sont pas commitées dans le code.

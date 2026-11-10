@@ -15,9 +15,9 @@ jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -143,14 +143,14 @@ jobs:
           done
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: upchat-apk
           path: build/app/outputs/flutter-apk/app-*.apk
           retention-days: 30
 
       - name: Upload universal APK for the website job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: upchat-apk-universal
           path: build/app/outputs/flutter-apk/app-release.apk
@@ -160,9 +160,9 @@ jobs:
     needs: build-apk
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
@@ -202,14 +202,14 @@ jobs:
           fi
 
       - name: Upload web build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: upchat-web
           path: build/web
           retention-days: 30
 
       - name: Download universal APK for the website
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: upchat-apk-universal
           path: build/universal
@@ -288,12 +288,22 @@ jobs:
       - name: Deploy to Firebase Hosting
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
-          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
-            echo "::warning::FIREBASE_SERVICE_ACCOUNT_JSON absent"
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ] && [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" ] && [ -z "$FIREBASE_TOKEN" ]; then
+            echo "::notice::Firebase Hosting ignoré : ajoute FIREBASE_SERVICE_ACCOUNT_JSON (recommandé) ou FIREBASE_TOKEN dans les secrets GitHub."
             exit 0
           fi
           flutter build web --release --base-href "/" -o build/web-firebase
-          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-sa.json"
-          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
-          npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive
+          if [ -n "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON_BASE64" | base64 --decode > "$RUNNER_TEMP/firebase-sa.json"
+            export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+            npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive
+          elif [ -n "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-sa.json"
+            export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-sa.json"
+            npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive
+          else
+            npx --yes firebase-tools@13 deploy --only hosting --project upchat-android --non-interactive --token "$FIREBASE_TOKEN"
+          fi

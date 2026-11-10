@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -153,7 +153,7 @@ jobs:
           echo "IPA Sideloadly prêt: build/ios/ipa/UpChat.ipa"
 
       - name: Upload Sideloadly IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: upchat-sideloadly-ipa
           path: build/ios/ipa/UpChat.ipa
@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload debug symbols
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: upchat-ios-symbols
           path: symbols/
