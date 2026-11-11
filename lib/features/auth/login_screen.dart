@@ -177,7 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final result = await action();
-      if (!isCreatingAccount && !await _verifyExistingEmail(result)) return;
+      if (_mode == _AuthMode.signIn && !await _verifyExistingEmail(result)) return;
       await _onAuthSuccess(result);
     } on FirebaseAuthException catch (error) {
       debugPrint('Login Firebase error: ${error.code}');
