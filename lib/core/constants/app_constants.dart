@@ -73,7 +73,6 @@ class AppConstants {
   static const String keyAutoDownloadMedia = 'settings_auto_download_media';
   static const String keySaveToGallery = 'settings_save_to_gallery';
   static const String keyLowDataMode = 'settings_low_data_mode';
-  static const String keyTransparentToolbar = 'settings_transparent_toolbar';
   static const String keyChatFontScale = 'settings_chat_font_scale';
   static const String keyBiometricLock = 'settings_biometric_lock';
 

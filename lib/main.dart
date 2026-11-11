@@ -354,9 +354,7 @@ class UpChatApp extends StatelessWidget {
     return base.copyWith(
       extensions: <ThemeExtension<dynamic>>[glass],
       appBarTheme: base.appBarTheme.copyWith(
-        backgroundColor: settings.transparentToolbar
-            ? Colors.transparent
-            : base.colorScheme.surface,
+        backgroundColor: base.colorScheme.surface,
       ),
     );
   }

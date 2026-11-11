@@ -11,9 +11,8 @@ class BiometricLockProvider extends ChangeNotifier {
   BiometricLockProvider({BiometricAuthService? service})
     : _service = service ?? BiometricAuthService() {
     _enabled = StorageService.biometricLockEnabled;
-    // Ne bloque jamais l’ouverture initiale. Le verrou s’applique uniquement
-    // après un passage en arrière-plan, afin de ne pas perturber le démarrage.
-    _locked = false;
+    // Comme Ma caisse, une préférence active protège aussi l’ouverture initiale.
+    _locked = _enabled;
   }
 
   final BiometricAuthService _service;

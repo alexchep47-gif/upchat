@@ -113,6 +113,28 @@ class FirebaseAuthService {
     }
   }
 
+  Future<void> sendEmailVerification() async {
+    if (!await initialize()) {
+      throw StateError(lastError ?? 'Service de connexion indisponible.');
+    }
+    final user = _auth!.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'Aucun compte Firebase connecté.',
+      );
+    }
+    await user.sendEmailVerification();
+  }
+
+  Future<bool> refreshEmailVerification() async {
+    if (!await initialize()) return false;
+    final user = _auth!.currentUser;
+    if (user == null) return false;
+    await user.reload();
+    return _auth!.currentUser?.emailVerified ?? false;
+  }
+
   Future<UserCredential?> signInWithGoogle() async {
     if (!await initialize()) return null;
     lastError = null;

@@ -33,7 +33,9 @@ class BiometricAuthService {
 
   final LocalAuthentication _localAuthentication;
 
-  /// Vérifie le matériel et l’inscription d’au moins une biométrie.
+  /// Vérifie que l’appareil peut fournir une authentification locale.
+  /// Le code, schéma ou mot de passe reste un secours valide lorsque la
+  /// biométrie n’est pas enrôlée, comme sur l’écran de verrouillage système.
   Future<BiometricAuthResult> checkAvailability() async {
     if (kIsWeb) {
       return const BiometricAuthResult(
@@ -44,27 +46,15 @@ class BiometricAuthService {
 
     try {
       final isSupported = await _localAuthentication.isDeviceSupported();
-      final canCheckBiometrics = await _localAuthentication.canCheckBiometrics;
       if (!isSupported) {
         return const BiometricAuthResult(
           BiometricAuthStatus.unavailable,
           'La vérification de l’appareil est indisponible. Utilise un téléphone protégé.',
         );
       }
-      if (!canCheckBiometrics) {
-        return const BiometricAuthResult(
-          BiometricAuthStatus.available,
-          'La biométrie est indisponible ; le code du téléphone sera proposé.',
-        );
-      }
-      final enrolled = await _localAuthentication.getAvailableBiometrics();
-      return BiometricAuthResult(
-        enrolled.isEmpty
-            ? BiometricAuthStatus.notEnrolled
-            : BiometricAuthStatus.available,
-        enrolled.isEmpty
-            ? 'Aucune empreinte n’est enregistrée. Le code du téléphone reste disponible.'
-            : 'La biométrie ou le code du téléphone sont disponibles.',
+      return const BiometricAuthResult(
+        BiometricAuthStatus.available,
+        'La biométrie ou le code du téléphone sont disponibles.',
       );
     } on LocalAuthException catch (error) {
       return _fromException(error);

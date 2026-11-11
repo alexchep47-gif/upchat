@@ -42,12 +42,8 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
         WidgetsBinding.instance.addPostFrameCallback((_) => _unlockIfNeeded());
         break;
       case AppLifecycleState.inactive:
-        // Masque sans délai les conversations dans le sélecteur d’applications.
-        // La demande locale de local_auth peut aussi déclencher cet état : elle
-        // reste autorisée à terminer sans créer une boucle de verrouillage.
-        if (!lock.isAuthenticating) {
-          lock.lock();
-        }
+        // Ne pas verrouiller ici : local_auth passe lui-même par inactive sur
+        // Android/iOS et cela créait une boucle de demande biométrique.
         break;
     }
   }

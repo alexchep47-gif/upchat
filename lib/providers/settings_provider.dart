@@ -18,7 +18,6 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoDownloadMedia = true;
   bool _saveToGallery = false;
   bool _lowDataMode = false;
-  bool _transparentToolbar = true;
   double _chatFontScale = 1;
 
   SettingsProvider() {
@@ -35,7 +34,6 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoDownloadMedia => _autoDownloadMedia;
   bool get saveToGallery => _saveToGallery;
   bool get lowDataMode => _lowDataMode;
-  bool get transparentToolbar => _transparentToolbar;
   double get chatFontScale => _chatFontScale;
 
   void _load() {
@@ -50,7 +48,6 @@ class SettingsProvider extends ChangeNotifier {
     _autoDownloadMedia = box.get(AppConstants.keyAutoDownloadMedia, defaultValue: true) as bool;
     _saveToGallery = box.get(AppConstants.keySaveToGallery, defaultValue: false) as bool;
     _lowDataMode = box.get(AppConstants.keyLowDataMode, defaultValue: false) as bool;
-    _transparentToolbar = box.get(AppConstants.keyTransparentToolbar, defaultValue: true) as bool;
     _chatFontScale = (box.get(AppConstants.keyChatFontScale, defaultValue: 1.0) as num).toDouble();
   }
 
@@ -70,7 +67,6 @@ class SettingsProvider extends ChangeNotifier {
   Future<void> setAutoDownloadMedia(bool value) => _set(AppConstants.keyAutoDownloadMedia, value, () => _autoDownloadMedia = value);
   Future<void> setSaveToGallery(bool value) => _set(AppConstants.keySaveToGallery, value, () => _saveToGallery = value);
   Future<void> setLowDataMode(bool value) => _set(AppConstants.keyLowDataMode, value, () => _lowDataMode = value);
-  Future<void> setTransparentToolbar(bool value) => _set(AppConstants.keyTransparentToolbar, value, () => _transparentToolbar = value);
   Future<void> setChatFontScale(double value) => _set(AppConstants.keyChatFontScale, value, () => _chatFontScale = value);
 
   /// Instantané stable pour les écrans qui appliquent plusieurs réglages.
@@ -85,7 +81,6 @@ class SettingsProvider extends ChangeNotifier {
         'autoDownloadMedia': _autoDownloadMedia,
         'saveToGallery': _saveToGallery,
         'lowDataMode': _lowDataMode,
-        'transparentToolbar': _transparentToolbar,
         'chatFontScale': _chatFontScale,
       };
 }

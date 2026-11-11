@@ -521,13 +521,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 groupValue: themeProvider.themeMode,
                 onChanged: (v) => themeProvider.setThemeMode(v!),
               ),
-              _toggle(
-                icon: Icons.blur_on_rounded,
-                title: 'Effets de transparence',
-                subtitle: 'Verre flou sur les barres et menus ; désactive-le pour économiser la batterie',
-                value: settings.transparentToolbar,
-                onChanged: settings.setTransparentToolbar,
-              ),
             ]),
             _section('Aide', Icons.help_outline_rounded, [
               ListTile(
@@ -680,7 +673,6 @@ class _SettingsSearchDelegate extends SearchDelegate<void> {
     'Données et stockage',
     'Mode économie de données',
     'Apparence',
-    'Effets de transparence',
   ];
 
   @override

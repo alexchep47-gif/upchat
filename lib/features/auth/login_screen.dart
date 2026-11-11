@@ -8,7 +8,9 @@ import '../../core/utils/error_mapper.dart';
 import '../../data/services/firebase_auth_service.dart';
 import '../../data/services/internet_service.dart';
 import '../../data/services/storage_service.dart';
+import '../profile/phone_verification_screen.dart';
 import '../../widgets/app_form_controls.dart';
+import 'email_verification_screen.dart';
 
 enum _AuthMode { signIn, createAccount }
 
@@ -24,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
+  final _phone = TextEditingController();
 
   _AuthMode _mode = _AuthMode.signIn;
   bool _loading = false;
@@ -45,6 +48,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _email.addListener(_refreshForm);
     _password.addListener(_refreshForm);
     _confirmation.addListener(_refreshForm);
+    _phone.addListener(_refreshForm);
   }
 
   @override
@@ -56,6 +60,9 @@ class _LoginScreenState extends State<LoginScreen> {
       ..removeListener(_refreshForm)
       ..dispose();
     _confirmation
+      ..removeListener(_refreshForm)
+      ..dispose();
+    _phone
       ..removeListener(_refreshForm)
       ..dispose();
     super.dispose();
@@ -72,6 +79,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool get _hasLetter => RegExp(r'[A-Za-zÀ-ÿ]').hasMatch(_password.text);
   bool get _hasDigit => RegExp(r'\d').hasMatch(_password.text);
   bool get _hasStrongPassword => _hasEightCharacters && _hasLetter && _hasDigit;
+  bool get _hasValidPhone => StorageService.normalizePhone(_phone.text).length >= 10;
   bool get _canSubmit {
     if (_mode == _AuthMode.signIn) {
       return _hasValidEmail && _hasLoginPassword;
@@ -79,6 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return _hasValidEmail &&
         _hasStrongPassword &&
         _password.text == _confirmation.text &&
+        _hasValidPhone &&
         _acceptedTerms;
   }
 
@@ -104,9 +113,12 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     final user = credential!.user!;
+    await StorageService.setOnboardingDone();
     await StorageService.setUserId(user.uid);
     if (user.displayName != null && user.displayName!.trim().isNotEmpty) {
       await StorageService.setUserName(user.displayName!.trim());
+    } else if (user.email != null && user.email!.contains('@')) {
+      await StorageService.setUserName(user.email!.split('@').first);
     }
     await InternetService().setEnabled(true);
     await InternetService().reregister();
@@ -115,6 +127,24 @@ class _LoginScreenState extends State<LoginScreen> {
       context,
     ).showSnackBar(const SnackBar(content: Text('Connexion réussie.')));
     await _goHome();
+  }
+
+  Future<bool> _verifyExistingEmail(UserCredential? credential) async {
+    final user = credential?.user;
+    final isPasswordAccount = user?.providerData.any(
+          (provider) => provider.providerId == 'password',
+        ) ??
+        false;
+    if (user == null || !isPasswordAccount || user.emailVerified) return true;
+
+    await FirebaseAuthService.instance.sendEmailVerification();
+    if (!mounted) return false;
+    final verified = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const EmailVerificationScreen()),
+    );
+    if (verified == true) return true;
+    await FirebaseAuthService.instance.signOut();
+    return false;
   }
 
   Future<void> _run(
@@ -147,6 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
       final result = await action();
+      if (!isCreatingAccount && !await _verifyExistingEmail(result)) return;
       await _onAuthSuccess(result);
     } on FirebaseAuthException catch (error) {
       debugPrint('Login Firebase error: ${error.code}');
@@ -212,14 +243,30 @@ class _LoginScreenState extends State<LoginScreen> {
     return _run(FirebaseAuthService.instance.signInWithGoogle, isGoogle: true);
   }
 
-  Future<void> _createAccount() {
-    return _run(
-      () => FirebaseAuthService.instance.createAccount(
+  Future<void> _createAccount() async {
+    await _run(() async {
+      final credential = await FirebaseAuthService.instance.createAccount(
         _email.text,
         _password.text,
-      ),
-      isGoogle: false,
-    );
+      );
+      if (credential?.user == null || !mounted) return credential;
+
+      final verifiedPhone = await Navigator.of(context).push<String>(
+        MaterialPageRoute(
+          builder: (_) => PhoneVerificationScreen(
+            initialPhone: StorageService.normalizePhone(_phone.text),
+          ),
+        ),
+      );
+      if (verifiedPhone == null) {
+        await FirebaseAuthService.instance.signOut();
+        throw FirebaseAuthException(
+          code: 'phone-verification-required',
+          message: 'Le numéro doit être vérifié par SMS pour créer ce compte.',
+        );
+      }
+      return credential;
+    }, isGoogle: false);
   }
 
   Future<void> _submitEmailForm() async {
@@ -326,6 +373,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     if (_mode == _AuthMode.createAccount && !_hasStrongPassword) {
       return 'Utilise au moins 8 caractères, une lettre et un chiffre.';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (_mode == _AuthMode.createAccount && !_hasValidPhone) {
+      return 'Saisis un numéro international valide.';
     }
     return null;
   }
@@ -450,6 +504,19 @@ class _LoginScreenState extends State<LoginScreen> {
                             validator: _validateEmail,
                             enabled: !_loading,
                           ),
+                          if (creating) ...[
+                            const SizedBox(height: 12),
+                            AppTextField(
+                              controller: _phone,
+                              label: 'Numéro de téléphone',
+                              prefixIcon: Icons.phone_outlined,
+                              hintText: '+237 6 77 15 23 00',
+                              keyboardType: TextInputType.phone,
+                              textInputAction: TextInputAction.next,
+                              validator: _validatePhone,
+                              enabled: !_loading,
+                            ),
+                          ],
                           const SizedBox(height: 12),
                           AppTextField(
                             controller: _password,
