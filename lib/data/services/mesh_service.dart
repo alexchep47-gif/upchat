@@ -2,13 +2,16 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/constants/app_constants.dart';
 import '../models/message_model.dart';
 import 'nearby_service.dart';
 import 'storage_service.dart';
 
-/// Service de relais mesh (1 hop)
+/// Service de relais mesh (store-and-forward local)
+///
 /// Si le destinataire n'est pas directement connecté, on demande aux
 /// voisins de retransmettre le message quand ils le rencontrent.
+/// Limité volontairement (maxHops) pour rester léger et éviter les boucles.
 class MeshService {
   static final MeshService _instance = MeshService._internal();
   factory MeshService() => _instance;
@@ -23,7 +26,7 @@ class MeshService {
   // IDs déjà vus (anti-boucle)
   final Set<String> _seenMessageIds = {};
 
-  static const int maxHops = 2; // 1 hop = voisin direct, 2 = voisin du voisin
+  static int get maxHops => AppConstants.meshMaxHops;
 
   /// Envoie un message avec relais mesh si nécessaire
   Future<bool> sendWithMesh({
@@ -64,6 +67,7 @@ class MeshService {
     // 2. Pas de connexion directe → relais via tous les voisins
     final relayPayload = {
       'type': 'mesh_relay',
+      'protocol': 'upchat.mesh.v1',
       'messageId': messageId,
       'targetUserId': targetUserId,
       'conversationId': conversationId,
@@ -74,7 +78,7 @@ class MeshService {
       'hop': 1,
       'maxHops': maxHops,
       'ttl': maxHops,
-      'createdAt': DateTime.now().toIso8601String(),
+      'createdAt': DateTime.now().toUtc().toIso8601String(),
     };
 
     _pendingRelay[messageId] = relayPayload;
@@ -93,7 +97,10 @@ class MeshService {
       if (ok) anySent = true;
     }
 
-    debugPrint('Mesh: message $messageId mis en relais (direct=false, sent=$anySent)');
+    debugPrint(
+      'Mesh: message $messageId mis en relais '
+      '(direct=false, voisins=${_nearby.connectedEndpoints.length}, sent=$anySent)',
+    );
     return anySent;
   }
 
@@ -106,9 +113,11 @@ class MeshService {
 
     final targetUserId = payload['targetUserId'] as String?;
     final hop = (payload['hop'] as int? ?? 1) + 1;
-    final maxHops = payload['maxHops'] as int? ?? MeshService.maxHops;
-    final ttl = (payload['ttl'] as int? ?? maxHops) - 1;
+    final maxHopsValue = payload['maxHops'] as int? ?? MeshService.maxHops;
+    final ttl = (payload['ttl'] as int? ?? maxHopsValue) - 1;
     final createdAt = DateTime.tryParse(payload['createdAt'] as String? ?? '');
+
+    // TTL expiré ou trop ancien → abandon
     if (ttl < 0 ||
         (createdAt != null &&
             DateTime.now().toUtc().difference(createdAt.toUtc()) >
@@ -118,10 +127,11 @@ class MeshService {
 
     // Est-ce pour moi ?
     if (targetUserId == StorageService.userId) {
-      // Message destiné à moi → créer le message local
       final message = MessageModel(
         id: messageId,
-        conversationId: payload['conversationId'] as String? ?? payload['senderId'] as String? ?? '',
+        conversationId: payload['conversationId'] as String? ??
+            payload['senderId'] as String? ??
+            '',
         senderId: payload['senderId'] as String? ?? '',
         senderName: payload['senderName'] as String? ?? 'Inconnu',
         type: MessageType.values.firstWhere(
@@ -133,27 +143,25 @@ class MeshService {
         status: MessageStatus.delivered,
       );
 
-      // Notifie via NearbyService callback (réutilise le même canal)
       NearbyService().onMessageReceived?.call(message);
-      debugPrint('Mesh: message $messageId reçu pour moi');
+      debugPrint('Mesh: message $messageId reçu pour moi (hop=$hop)');
       return;
     }
 
     // Sinon, on relaie si on n'a pas dépassé le max hops
-    if (hop <= maxHops) {
+    if (hop <= maxHopsValue) {
       final nextPayload = Map<String, dynamic>.from(payload);
       nextPayload['hop'] = hop;
       nextPayload['ttl'] = ttl;
 
       for (final endpointId in _nearby.connectedEndpoints.keys) {
-        // Ne pas renvoyer à l'émetteur original si possible
         _nearby.sendTextMessage(
           endpointId: endpointId,
           conversationId: 'mesh_relay',
           text: jsonEncode(nextPayload),
         );
       }
-      debugPrint('Mesh: relais hop $hop pour $messageId');
+      debugPrint('Mesh: relais hop $hop/$maxHopsValue pour $messageId');
     }
   }
 
@@ -164,13 +172,19 @@ class MeshService {
     for (final entry in _pendingRelay.entries) {
       final payload = entry.value;
       if (payload['targetUserId'] == userId) {
-        await _nearby.sendTextMessage(
+        final content = payload['content'] as String? ?? '';
+        final conversationId =
+            payload['conversationId'] as String? ?? userId;
+
+        final ok = await _nearby.sendTextMessage(
           endpointId: endpointId,
-          conversationId: payload['conversationId'] as String? ?? '',
-          text: payload['content'] as String? ?? '',
+          conversationId: conversationId,
+          text: content,
         );
-        toRemove.add(entry.key);
-        debugPrint('Mesh: livraison différée de ${entry.key} à $userId');
+        if (ok) {
+          toRemove.add(entry.key);
+          debugPrint('Mesh: livraison différée de ${entry.key} à $userId');
+        }
       }
     }
 
