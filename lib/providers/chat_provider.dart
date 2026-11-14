@@ -82,7 +82,8 @@ class ChatProvider extends ChangeNotifier {
 
     for (final key in StorageService.messages.keys) {
       if (key.toString().startsWith('relay_') ||
-          key.toString().startsWith('outbox_')) {
+          key.toString().startsWith('outbox_') ||
+          key.toString().startsWith('outbox_v1_')) {
         continue;
       }
       final map = StorageService.messages.get(key);
@@ -121,6 +122,10 @@ class ChatProvider extends ChangeNotifier {
     return conv;
   }
 
+  /// Routing hybride priorisé :
+  /// 1. Nearby direct (meilleure latence, offline)
+  /// 2. Internet si le relais est prêt (comportement type WhatsApp)
+  /// 3. Mesh en dernier recours (store-and-forward local)
   Future<void> sendTextMessage({
     required String conversationId,
     required String text,
@@ -147,6 +152,8 @@ class ChatProvider extends ChangeNotifier {
       _updateMessageStatus(message.id, MessageStatus.failed);
       return;
     }
+
+    // Toujours en file d'attente locale (aucune perte)
     await _offline.enqueue(
       messageId: message.id,
       targetUserId: conversationId,
@@ -156,6 +163,7 @@ class ChatProvider extends ChangeNotifier {
 
     bool success = false;
 
+    // 1. Nearby direct si possible
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
         endpointId: endpointId,
@@ -164,23 +172,22 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    if (!success) {
-      success = await _mesh.sendWithMesh(
-        targetUserId: conversationId,
-        conversationId: conversationId,
-        text: wireText,
-      );
-    }
-
-    // Internet : tente toujours si contact téléphone connu ou mode activé
+    // 2. Internet (prioritaire sur le mesh pour les contacts distants)
     if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
       final shouldTryNet =
-          _internet.isEnabled || (phone != null && phone.isNotEmpty);
+          _internet.isReady ||
+          _internet.isEnabled ||
+          (phone != null && phone.isNotEmpty);
+
       if (shouldTryNet) {
         if (!_internet.isEnabled) {
           await _internet.setEnabled(true);
+        }
+        // Force une tentative de connexion si pas encore prêt
+        if (!_internet.isReady) {
+          await _internet.reregister(force: true);
         }
         success = await _internet.sendMessage(
           messageId: message.id,
@@ -190,6 +197,15 @@ class ChatProvider extends ChangeNotifier {
           targetPhone: phone,
         );
       }
+    }
+
+    // 3. Mesh en dernier recours (voisinage local uniquement)
+    if (!success) {
+      success = await _mesh.sendWithMesh(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: wireText,
+      );
     }
 
     _updateMessageStatus(
@@ -208,10 +224,10 @@ class ChatProvider extends ChangeNotifier {
     final preview = type == MessageType.image
         ? '📷 Photo'
         : type == MessageType.video
-        ? '🎬 Vidéo'
-        : type == MessageType.audio
-        ? '🎤 Note vocale'
-        : '📎 Fichier';
+            ? '🎬 Vidéo'
+            : type == MessageType.audio
+                ? '🎤 Note vocale'
+                : '📎 Fichier';
 
     final message = MessageModel(
       id: _uuid.v4(),
@@ -235,6 +251,8 @@ class ChatProvider extends ChangeNotifier {
     );
 
     bool success = false;
+
+    // 1. Nearby direct
     if (endpointId != null) {
       success = await _nearby.sendFile(
         endpointId: endpointId,
@@ -243,20 +261,19 @@ class ChatProvider extends ChangeNotifier {
         mediaType: type,
       );
     }
-    if (!success) {
-      success = await _mesh.sendWithMesh(
-        targetUserId: conversationId,
-        conversationId: conversationId,
-        text: preview,
-        type: type,
-        mediaPath: mediaPath,
-      );
-    }
+
+    // 2. Internet
     if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
-      if (_internet.isEnabled || (phone != null && phone.isNotEmpty)) {
+      final shouldTryNet =
+          _internet.isReady ||
+          _internet.isEnabled ||
+          (phone != null && phone.isNotEmpty);
+
+      if (shouldTryNet) {
         if (!_internet.isEnabled) await _internet.setEnabled(true);
+        if (!_internet.isReady) await _internet.reregister(force: true);
         success = await _internet.sendMessage(
           messageId: message.id,
           targetUserId: conversationId,
@@ -267,6 +284,17 @@ class ChatProvider extends ChangeNotifier {
           targetPhone: phone,
         );
       }
+    }
+
+    // 3. Mesh
+    if (!success) {
+      success = await _mesh.sendWithMesh(
+        targetUserId: conversationId,
+        conversationId: conversationId,
+        text: preview,
+        type: type,
+        mediaPath: mediaPath,
+      );
     }
 
     _updateMessageStatus(
@@ -341,7 +369,8 @@ class ChatProvider extends ChangeNotifier {
 
   void _onIncomingMessage(MessageModel message) {
     if (message.content.startsWith('{') &&
-        message.content.contains('mesh_relay')) {
+        (message.content.contains('mesh_relay') ||
+            message.content.contains('upchat.mesh.v1'))) {
       try {
         final map = jsonDecode(message.content) as Map<String, dynamic>;
         if (map['type'] == 'mesh_relay') {
@@ -391,7 +420,6 @@ class ChatProvider extends ChangeNotifier {
 
   void _storeIncomingMessage(MessageModel message) {
     // Chez le destinataire, la conversation = id de l’expéditeur
-    // (pas le conversationId envoyé par l’émetteur, qui est souvent notre propre id).
     final peerId = message.isMe ? message.conversationId : message.senderId;
     final normalized = message.copyWith(conversationId: peerId);
 

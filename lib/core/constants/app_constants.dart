@@ -1,8 +1,8 @@
 /// Constantes globales de l'application UpChat
 class AppConstants {
   static const String appName = 'UpChat';
-  static const String appVersion = '1.3.2';
-  static const String appTagline = 'Messagerie 100 % offline';
+  static const String appVersion = '1.3.3';
+  static const String appTagline = 'Discute avec ou sans réseau';
 
   // Auteur
   static const String authorName = 'NEMMEGNE CHEPING ALEXANDRE MERVIN';
@@ -45,7 +45,7 @@ class AppConstants {
   static const int maxImageSizeKb = 800;
   static const int maxGroupMembers = 50;
   static const int maxMessageLength = 2000;
-  static const int meshMaxHops = 2;
+  static const int meshMaxHops = 3; // légèrement relevé pour le store-and-forward local
 
   // Clés de stockage
   static const String keyUserId = 'user_id';
