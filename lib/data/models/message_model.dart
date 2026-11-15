@@ -2,7 +2,7 @@
 enum MessageType { text, image, video, audio, file, system }
 
 /// Statut d'un message
-enum MessageStatus { sending, sent, delivered, read, failed }
+enum MessageStatus { sending, queued, sent, delivered, read, failed }
 
 /// Modèle d'un message
 class MessageModel {

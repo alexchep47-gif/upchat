@@ -49,7 +49,6 @@ class ChatProvider extends ChangeNotifier {
     };
     _internet.onMessageReceived = _onIncomingMessage;
     _internet.onMessageStatus = _updateMessageStatus;
-    // Charge le mode internet au démarrage
     _internet.loadPreference();
   }
 
@@ -153,7 +152,6 @@ class ChatProvider extends ChangeNotifier {
       return;
     }
 
-    // Toujours en file d'attente locale (aucune perte)
     await _offline.enqueue(
       messageId: message.id,
       targetUserId: conversationId,
@@ -163,7 +161,6 @@ class ChatProvider extends ChangeNotifier {
 
     bool success = false;
 
-    // 1. Nearby direct si possible
     if (endpointId != null) {
       success = await _nearby.sendTextMessage(
         endpointId: endpointId,
@@ -172,7 +169,6 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    // 2. Internet (prioritaire sur le mesh pour les contacts distants)
     if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
@@ -185,7 +181,6 @@ class ChatProvider extends ChangeNotifier {
         if (!_internet.isEnabled) {
           await _internet.setEnabled(true);
         }
-        // Force une tentative de connexion si pas encore prêt
         if (!_internet.isReady) {
           await _internet.reregister(force: true);
         }
@@ -199,7 +194,6 @@ class ChatProvider extends ChangeNotifier {
       }
     }
 
-    // 3. Mesh en dernier recours (voisinage local uniquement)
     if (!success) {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
@@ -208,11 +202,13 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    _updateMessageStatus(
-      message.id,
-      success ? MessageStatus.sent : MessageStatus.failed,
-    );
-    if (success) await _offline.acknowledge(message.id);
+    if (!success) {
+      _updateMessageStatus(message.id, MessageStatus.queued);
+      return;
+    }
+
+    _updateMessageStatus(message.id, MessageStatus.sent);
+    await _offline.acknowledge(message.id);
   }
 
   Future<void> sendMediaMessage({
@@ -252,7 +248,6 @@ class ChatProvider extends ChangeNotifier {
 
     bool success = false;
 
-    // 1. Nearby direct
     if (endpointId != null) {
       success = await _nearby.sendFile(
         endpointId: endpointId,
@@ -262,7 +257,6 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    // 2. Internet
     if (!success) {
       final known = _phoneDir.all().where((u) => u.id == conversationId);
       final phone = known.isNotEmpty ? known.first.phoneNumber : null;
@@ -286,7 +280,6 @@ class ChatProvider extends ChangeNotifier {
       }
     }
 
-    // 3. Mesh
     if (!success) {
       success = await _mesh.sendWithMesh(
         targetUserId: conversationId,
@@ -297,11 +290,13 @@ class ChatProvider extends ChangeNotifier {
       );
     }
 
-    _updateMessageStatus(
-      message.id,
-      success ? MessageStatus.sent : MessageStatus.failed,
-    );
-    if (success) await _offline.acknowledge(message.id);
+    if (!success) {
+      _updateMessageStatus(message.id, MessageStatus.queued);
+      return;
+    }
+
+    _updateMessageStatus(message.id, MessageStatus.sent);
+    await _offline.acknowledge(message.id);
   }
 
   void _addLocalMessage(MessageModel message, {required String preview}) {
@@ -333,12 +328,14 @@ class ChatProvider extends ChangeNotifier {
         return 0;
       case MessageStatus.failed:
         return 0;
-      case MessageStatus.sent:
+      case MessageStatus.queued:
         return 1;
-      case MessageStatus.delivered:
+      case MessageStatus.sent:
         return 2;
-      case MessageStatus.read:
+      case MessageStatus.delivered:
         return 3;
+      case MessageStatus.read:
+        return 4;
     }
   }
 
@@ -419,7 +416,6 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void _storeIncomingMessage(MessageModel message) {
-    // Chez le destinataire, la conversation = id de l’expéditeur
     final peerId = message.isMe ? message.conversationId : message.senderId;
     final normalized = message.copyWith(conversationId: peerId);
 

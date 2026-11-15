@@ -39,7 +39,7 @@ class ConnectedDevicesScreen extends StatelessWidget {
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(
-                      'Gérez les sessions actives et les appareils UpChat à proximité.',
+                      'État de proximité, connexion et relais de signalisation.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -50,19 +50,19 @@ class ConnectedDevicesScreen extends StatelessWidget {
           const SizedBox(height: 12),
           _StatusCard(
             icon: connectivity.isOnline ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
-            title: connectivity.isOnline ? 'Relais internet actif' : 'Relais internet inactif',
+            title: connectivity.isOnline ? 'Relais internet : en ligne' : 'Relais internet : hors ligne',
             subtitle: connectivity.internetModeEnabled
-                ? 'La présence et les messages peuvent être relayés.'
-                : 'Active le mode internet dans Réglages pour synchroniser.',
+                ? 'La présence et les messages peuvent être relayés via le serveur.'
+                : 'Le mode internet reste désactivé ; le chat continue en local.',
             color: connectivity.isOnline ? AppColors.online : AppColors.textSecondaryLight,
           ),
           const SizedBox(height: 12),
           _StatusCard(
             icon: nearby.isRunning ? Icons.wifi_tethering_rounded : Icons.bluetooth_disabled_rounded,
-            title: nearby.isRunning ? 'Découverte de proximité active' : 'Découverte de proximité arrêtée',
+            title: nearby.isRunning ? 'Découverte locale : active' : 'Découverte locale : arrêtée',
             subtitle: nearby.isRunning
-                ? '${devices.length} appareil(s) trouvé(s) à portée.'
-                : 'Bluetooth et Wi‑Fi Direct restent disponibles hors ligne.',
+                ? '${devices.length} appareil(s) détecté(s) à portée. Les États “découvert” et “connecté” sont indiqués individuellement.'
+                : 'Bluetooth et Wi‑Fi Direct sont disponibles, mais aucun scan n’est actif.',
             color: nearby.isRunning ? AppColors.primary : AppColors.textSecondaryLight,
             action: nearby.isRunning
                 ? TextButton(onPressed: nearby.stop, child: const Text('Arrêter'))
@@ -83,7 +83,7 @@ class ConnectedDevicesScreen extends StatelessWidget {
                   children: [
                     Icon(Icons.devices_other_rounded, size: 36, color: AppColors.primary),
                     SizedBox(height: 10),
-                    Text('Aucun appareil connecté', textAlign: TextAlign.center),
+                    Text('Aucun appareil détecté', textAlign: TextAlign.center),
                     SizedBox(height: 4),
                     Text('Les appareils UpChat apparaîtront ici lorsqu’ils seront à portée.', textAlign: TextAlign.center),
                   ],
@@ -98,7 +98,11 @@ class ConnectedDevicesScreen extends StatelessWidget {
                       child: const Icon(Icons.smartphone_rounded, color: AppColors.primary),
                     ),
                     title: Text(device.name),
-                    subtitle: Text(nearby.connectedEndpoints.containsValue(device.id) ? 'Connecté' : 'Découvert'),
+                    subtitle: Text(
+                      nearby.connectedEndpoints.containsValue(device.id)
+                          ? 'Statut : connecté'
+                          : 'Statut : détecté, pas encore connecté',
+                    ),
                     trailing: nearby.connectedEndpoints.containsValue(device.id)
                         ? const Icon(Icons.check_circle_rounded, color: AppColors.online)
                         : const Icon(Icons.radio_button_unchecked_rounded),
