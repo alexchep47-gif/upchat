@@ -1,9 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:upchat/data/models/message_model.dart';
 import 'package:upchat/data/services/signal_crypto_service.dart';
 
 void main() {
-  group('SignalCryptoService transport envelope', () {
-    test('SignalEnvelope survives a round-trip to map and back', () {
+  group('Signal transport envelope', () {
+    test('survives a map round-trip', () {
       const envelope = SignalEnvelope(
         messageId: 'msg-42',
         senderId: 'alice',
@@ -20,8 +21,20 @@ void main() {
       expect(decoded.preKeyMessage, isTrue);
     });
 
-    test('queued state is tracked explicitly in the message lifecycle', () {
-      expect(MessageStatus.values.contains(MessageStatus.queued), isTrue);
+    test('queued is a persisted delivery state', () {
+      final message = MessageModel(
+        id: 'queued-message',
+        conversationId: 'bob',
+        senderId: 'alice',
+        senderName: 'Alice',
+        type: MessageType.text,
+        content: 'hello',
+        isMe: true,
+        status: MessageStatus.queued,
+      );
+
+      final restored = MessageModel.fromMap(message.toMap());
+      expect(restored.status, MessageStatus.queued);
     });
   });
 }
