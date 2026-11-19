@@ -215,6 +215,7 @@ jobs:
           path: build/universal
 
       - name: Deploy to upchat-web /app (Vercel)
+        if: github.ref == 'refs/heads/main'
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
@@ -242,6 +243,7 @@ jobs:
           git push origin main
 
       - name: Build + force-publish GitHub Pages (latest web)
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -276,6 +278,7 @@ jobs:
           echo "Pages branch updated: https://alexchep47-gif.github.io/upchat/?v=${BUILD_ID}"
 
       - name: Trigger official Pages deployment job
+        if: github.ref == 'refs/heads/main'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -286,6 +289,7 @@ jobs:
             -d '{"ref":"main"}' || true
 
       - name: Deploy to Firebase Hosting
+        if: github.ref == 'refs/heads/main'
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
           FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
