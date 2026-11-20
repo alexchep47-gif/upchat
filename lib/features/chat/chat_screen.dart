@@ -799,6 +799,11 @@ class _StatusIcon extends StatelessWidget {
         color = isDark ? Colors.white30 : Colors.black26;
         label = 'Message en attente d’envoi';
         break;
+      case MessageStatus.queued:
+        icon = Icons.schedule_rounded;
+        color = isDark ? Colors.white30 : Colors.black26;
+        label = 'Message en attente de connexion';
+        break;
       case MessageStatus.sent:
         icon = Icons.done_rounded;
         color = isDark ? Colors.white54 : Colors.black38;
